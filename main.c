@@ -12,7 +12,7 @@ int main()
 {
     struct f myf;
     myf.x = 3;
-    int s = sum(3, 4);
+    int s = sum(myf, 4);
     printf("Hello, world! %d\n", s);
 }
 

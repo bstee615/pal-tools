@@ -56,8 +56,8 @@ def main():
     
     cur = tu.cursor
 
-    structs = list(find_structs(cur))
-    spellings_structs = zip((s.spelling for s in structs), structs)
+    structs = find_structs(cur)
+    spellings_structs = ((n.spelling, n) for n in structs)
     structs_by_spelling = dict(spellings_structs)
     print(pp(structs_by_spelling['f']))
 
