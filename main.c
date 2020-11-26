@@ -1,28 +1,13 @@
-class Person {
-};
+#include <stdio.h>
 
-
-class Room {
-public:
-    void add_person(Person person)
-    {
-        // do stuff
-    }
-
-private:
-    Person* people_in_room;
-};
-
-
-template <class T, int N>
-class Bag<T, N> {
-};
-
+int sum(int x, char y)
+{
+    int a = x + y;
+    return a;
+}
 
 int main()
 {
-    Person* p = new Person();
-    Bag<Person, 42> bagofpersons;
-
-    return 0;
+    int s = sum(3, 4);
+    printf("Hello, world! %d\n", s);
 }
