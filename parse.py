@@ -6,31 +6,36 @@
 import clang.cindex
 from clang.cindex import CursorKind
 
-def find_typerefs(node, typename):
-    """ Find all references to the type named 'typename'
+def pp(node):
     """
-    print(node.kind, node.spelling)
+    Return str of node for pretty print
+    """
+    return f'{node.displayname} [{node.location}]'
+
+def find_funcdefs(node):
+    """
+    Return all function declarations
+    """
 
     if node.location.file and node.location.file.name == 'main.c':
-        if node.kind.is_reference():
-            if node.spelling == typename:
-                print('Found %s [file=%s, line=%s, col=%s]' % (
-                    typename, node.location.file, node.location.line, node.location.column))
+        if node.kind == CursorKind.FUNCTION_DECL:
+            print(f'function decl {pp(node)}]')
+            yield node
     # Recurse for children of this node
-    for c in node.get_children():
-        find_typerefs(c, typename)
+    for child in node.get_children():
+        yield from find_funcdefs(child)
 
 def main():
     filename = 'main.c'
-    typename = '__int8_t'
 
     index = clang.cindex.Index.create()
     tu = index.parse(filename)
     print('Translation unit:', tu.spelling)
-    tu.save('tmp.c')
 
     cur = tu.cursor
-    find_typerefs(cur, typename)
+    funcdefs = find_funcdefs(cur)
+    last_funcdef = max(funcdefs, key=lambda n: n.location.line)
+    print(f'last: {pp(last_funcdef)}')
 
 if __name__ == "__main__":
     main()
