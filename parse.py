@@ -26,12 +26,11 @@ def find_funcdefs(node):
 
 def find_structs(node):
     """
-    Return all structs
+    Return all struct defs
     """
 
     if node.kind == CursorKind.STRUCT_DECL:
-        # print(f'struct decl {pp(node)}]')
-        yield node
+        yield node.spelling, node
     # Recurse for children of this node
     for child in node.get_children():
         yield from find_structs(child)
@@ -49,8 +48,10 @@ def main():
     print(f'last: {pp(last_funcdef)}')
 
     structs = find_structs(cur)
-    for s in filter(lambda n: n.location.file.name == filename, structs):
-        print(pp(s))
+    sd = dict(structs)
+    print(pp(sd['f']))
+    # for s in filter(lambda n: n.location.file.name == filename, structs):
+    #     print(pp(s))
 
 if __name__ == "__main__":
     main()
