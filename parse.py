@@ -36,7 +36,7 @@ class LocalVariable:
 
 def local_vars(type, varname):
     """
-    Return a list of input variables for type t's fields, down to primitives
+    Yields input variables for type t's fields, down to primitives
     """
 
     if type.kind == TypeKind.ELABORATED:
@@ -58,7 +58,7 @@ def local_vars(type, varname):
 
 def initializers(vars):
     """
-    Return a list of C statements to declare and read values for input vars.
+    Yields C statements to declare and read values for input vars.
     """
     
     def declare(v):
