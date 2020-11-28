@@ -4,7 +4,7 @@
 """
 
 import clang.cindex
-from clang.cindex import CursorKind
+from clang.cindex import CursorKind, TypeKind
 
 def pp(node):
     """
@@ -26,6 +26,35 @@ def find(node, kind, verbose=False):
     for child in node.get_children():
         yield from find(child, kind)
 
+from dataclasses import dataclass
+from typing import Any
+@dataclass
+class LocalVariable:
+    type: Any = None
+    name: Any = None
+    children: Any = 0
+
+def local_vars(type, varname):
+    """
+    Return a list of input variables for type t's fields, down to primitives
+    """
+
+    if type.kind == TypeKind.ELABORATED:
+        td = type.get_declaration()
+        children = list(td.get_children())
+        for fd in children:
+            yield from local_vars(fd.type, fd.displayname)
+        yield LocalVariable(type, varname, len(children))
+    elif type.kind == TypeKind.POINTER:
+        # TODO: Currently inits all ptrs as single values. What about arrays?
+        yield from local_vars(type.get_pointee(), f'{varname}_v')
+        yield LocalVariable(type, varname, 1)
+    elif type.kind == TypeKind.INT:
+        yield LocalVariable(type, varname)
+    elif type.kind == TypeKind.CHAR_S:
+        yield LocalVariable(type, varname)
+    else:
+        print('local variables unhandled kind', type.kind)
 def main():
     filename = 'main.c'
 
@@ -35,17 +64,14 @@ def main():
     
     cur = tu.cursor
 
-    structs = find(cur, CursorKind.STRUCT_DECL)
-    spellings_structs = ((n.spelling, n) for n in structs)
-    structs_by_spelling = dict(spellings_structs)
-    print(pp(structs_by_spelling['f']))
-
     funcdefs = find(cur, CursorKind.FUNCTION_DECL)
     last_funcdef = max(funcdefs, key=lambda n: n.location.file.name == filename and n.location.line)
     print(f'last: {pp(last_funcdef)}')
 
-    for child in find(last_funcdef, CursorKind.PARM_DECL):
-        print(pp(child))
+    parmesan = list(find(last_funcdef, CursorKind.PARM_DECL))
+    for parm in parmesan:
+        locals = list(local_vars(parm.type, parm.displayname))
+        print(parm.type.spelling, pp(parm), locals)
 
 if __name__ == "__main__":
     main()
