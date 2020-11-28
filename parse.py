@@ -56,38 +56,31 @@ def local_vars(type, varname):
     else:
         print('local variables unhandled kind', type.kind)
 
-def decls(vars):
+def initializers(vars):
     """
-    Return a list of C statements to declare input vars.
-    """
-
-    for v in vars:
-        s = v.type.spelling
-        n = v.name
-        yield f'{s} {n};'
-
-def defs(vars):
-    """
-    Return a list of C statements to define input vars.
+    Return a list of C statements to declare and read values for input vars.
     """
     
-    stack = []
-
-    for v in vars:
+    def declare(v):
+        return f'{v.type.spelling} {v.name};'
+        
+    def read_and_assign(i, v):
+        vars_so_far = vars[:i]
         if v.type.kind == TypeKind.ELABORATED:
-            for _ in range(v.children):
-                c = stack.pop()
-                yield f'{v.name}.{c.name} = {c.name};'
+            for c in reversed(vars_so_far[:-v.children]):
+                return f'{v.name}.{c.name} = {c.name};'
         elif v.type.kind == TypeKind.POINTER:
             # TODO: Currently inits all ptrs as single values. What about arrays?
-            yield f'{v.name} = {stack.pop().name};'
+            return f'{v.name} = {vars_so_far[-v.children].name};'
         elif v.type.kind == TypeKind.INT:
-            yield f'scanf(" %d", &{v.name});'
+            return f'scanf("%d", &{v.name});'
         elif v.type.kind == TypeKind.CHAR_S:
-            yield f'scanf(" %c", &{v.name});'
+            return f'scanf(" %c", &{v.name});'
         else:
             print('definitions unhandled kind', type.kind)
-        stack.append(v)
+
+    for i, v in enumerate(vars):
+        yield (declare(v), read_and_assign(i, v))
 
 def main():
     filename = 'main.c'
@@ -107,13 +100,11 @@ def main():
         locals = list(local_vars(parm.type, parm.displayname))
         print(parm.type.spelling, pp(parm), locals)
         
-        declarations = list(decls(locals))
-        definitions = list(defs(locals))
+        inits = list(initializers(locals))
 
-        for d in declarations:
-            print(d)
-        for d in definitions:
-            print(d)
+        decls, defs = zip(*inits)
+        print(decls)
+        print(defs)
 
     print(f'{last_funcdef.spelling}({", ".join(p.displayname for p in parmesan)})')
 
