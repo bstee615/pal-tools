@@ -55,6 +55,17 @@ def local_vars(type, varname):
         yield LocalVariable(type, varname)
     else:
         print('local variables unhandled kind', type.kind)
+
+def decls(vars):
+    """
+    Return a list of C statements to declare input vars.
+    """
+
+    for v in vars:
+        s = v.type.spelling
+        n = v.name
+        yield f'{s} {n};'
+
 def main():
     filename = 'main.c'
 
