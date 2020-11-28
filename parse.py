@@ -66,6 +66,29 @@ def decls(vars):
         n = v.name
         yield f'{s} {n};'
 
+def defs(vars):
+    """
+    Return a list of C statements to define input vars.
+    """
+    
+    stack = []
+
+    for v in vars:
+        if v.type.kind == TypeKind.ELABORATED:
+            for _ in range(v.children):
+                c = stack.pop()
+                yield f'{v.name}.{c.name} = {c.name};'
+        elif v.type.kind == TypeKind.POINTER:
+            # TODO: Currently inits all ptrs as single values. What about arrays?
+            yield f'{v.name} = {stack.pop().name};'
+        elif v.type.kind == TypeKind.INT:
+            yield f'scanf(" %d", &{v.name});'
+        elif v.type.kind == TypeKind.CHAR_S:
+            yield f'scanf(" %c", &{v.name});'
+        else:
+            print('definitions unhandled kind', type.kind)
+        stack.append(v)
+
 def main():
     filename = 'main.c'
 
@@ -83,6 +106,14 @@ def main():
     for parm in parmesan:
         locals = list(local_vars(parm.type, parm.displayname))
         print(parm.type.spelling, pp(parm), locals)
+
+        declarations = list(decls(locals))
+        definitions = list(defs(locals))
+
+        for d in declarations:
+            print(d)
+        for d in definitions:
+            print(d)
 
 if __name__ == "__main__":
     main()
