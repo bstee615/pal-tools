@@ -106,7 +106,7 @@ def main():
     for parm in parmesan:
         locals = list(local_vars(parm.type, parm.displayname))
         print(parm.type.spelling, pp(parm), locals)
-
+        
         declarations = list(decls(locals))
         definitions = list(defs(locals))
 
@@ -114,6 +114,8 @@ def main():
             print(d)
         for d in definitions:
             print(d)
+
+    print(f'{last_funcdef.spelling}({", ".join(p.displayname for p in parmesan)})')
 
 if __name__ == "__main__":
     main()
