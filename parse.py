@@ -91,6 +91,7 @@ def codegen(fn_name, param_names, inits):
     decls, defs = zip(*inits)
     joiner = '\n    '
 
+    print('generated test harness:')
     print(
         f'''
 int main() {{
@@ -121,9 +122,7 @@ def main():
     parmesan = list(find(target, CursorKind.PARM_DECL))
     for parm in parmesan:
         locals = list(local_vars(parm.type, parm.displayname))
-        print(locals)
         this_boy_inits = list(initializers(locals))
-        print(this_boy_inits)
         inits += this_boy_inits
 
     param_names = (p.displayname for p in parmesan)
