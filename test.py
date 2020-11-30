@@ -1,22 +1,41 @@
+import pytest
 import clang.cindex
 from clang.cindex import CursorKind
 from parse import find
 
-def test_find():
+@pytest.fixture
+def test_file():
     index = clang.cindex.Index.create()
-    file = ('fn.c', 'int fn(int a, char b) { }')
-    tu = index.parse(path='fn.c', unsaved_files=[file])
-    print('translation unit:', tu.spelling)
+    filename = 'fn.c'
+    text = '''
+struct foo
+{
+    int x;
+    char *y;
+};
 
-    fn_decls = list(find(tu.cursor, CursorKind.FUNCTION_DECL))
+int fn(int a, char b, struct foo c) {
+
+}
+'''
+    tu = index.parse(path=filename, unsaved_files=[(filename, text)])
+    return tu
+
+def test_find(test_file):
+    cur = test_file.cursor
+    fn_decls = list(find(cur, CursorKind.FUNCTION_DECL))
 
     assert len(fn_decls) == 1
     assert fn_decls[0].spelling == 'fn'
 
-    parm_decls = list(find(tu.cursor, CursorKind.PARM_DECL))
+    fn = fn_decls[0]
 
-    assert len(parm_decls) == 2
+    parm_decls = list(find(fn, CursorKind.PARM_DECL))
+
+    assert len(parm_decls) == 3
     assert parm_decls[0].spelling == 'a'
     assert parm_decls[0].type.spelling == 'int'
     assert parm_decls[1].spelling == 'b'
     assert parm_decls[1].type.spelling == 'char'
+    assert parm_decls[2].spelling == 'c'
+    assert parm_decls[2].type.spelling == 'struct foo'
