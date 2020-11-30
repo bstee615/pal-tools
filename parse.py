@@ -54,7 +54,7 @@ def local_vars(type, varname):
     elif type.kind == TypeKind.CHAR_S:
         yield LocalVariable(type, varname)
     else:
-        print('local variables unhandled kind', type.kind)
+        raise Exception('local variables unhandled kind', type.kind)
 
 def initializers(vars):
     """
@@ -77,7 +77,7 @@ def initializers(vars):
         elif v.type.kind == TypeKind.CHAR_S:
             return f'scanf(" %c", &{v.name});'
         else:
-            print('definitions unhandled kind', type.kind)
+            raise Exception('definitions unhandled kind', type.kind)
 
     for i, v in enumerate(vars):
         yield (declare(v), read_and_assign(i, v))
