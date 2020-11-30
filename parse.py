@@ -71,7 +71,7 @@ def initializers(vars):
                 return f'{v.name}.{c.name} = {c.name};'
         elif v.type.kind == TypeKind.POINTER:
             # TODO: Currently inits all ptrs as single values. What about arrays?
-            return f'{v.name} = {vars_so_far[-v.children].name};'
+            return f'{v.name} = &{vars_so_far[-v.children].name};'
         elif v.type.kind == TypeKind.INT:
             return f'scanf("%d", &{v.name});'
         elif v.type.kind == TypeKind.CHAR_S:
