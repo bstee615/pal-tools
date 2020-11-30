@@ -1,7 +1,7 @@
 import pytest
 import clang.cindex
 from clang.cindex import CursorKind
-from parse import find
+from parse import find, local_vars
 
 @pytest.fixture
 def test_file():
@@ -15,7 +15,7 @@ struct foo
 };
 
 int fn(int a, char b, struct foo c) {
-
+    return a + b + c.x;
 }
 '''
     tu = index.parse(path=filename, unsaved_files=[(filename, text)])
@@ -39,3 +39,32 @@ def test_find(test_file):
     assert parm_decls[1].type.spelling == 'char'
     assert parm_decls[2].spelling == 'c'
     assert parm_decls[2].type.spelling == 'struct foo'
+
+    a_decl, b_decl, c_decl = parm_decls
+
+    a_locals = list(local_vars(a_decl.type, a_decl.displayname))
+    assert len(a_locals) == 1
+    assert a_locals[0].name == 'a'
+    assert a_locals[0].type.spelling == 'int'
+    assert a_locals[0].children == 0
+
+    b_locals = list(local_vars(b_decl.type, b_decl.displayname))
+    assert len(b_locals) == 1
+    assert b_locals[0].name == 'b'
+    assert b_locals[0].type.spelling == 'char'
+    assert b_locals[0].children == 0
+
+    c_locals = list(local_vars(c_decl.type, c_decl.displayname))
+    assert len(c_locals) == 4
+    assert c_locals[0].name == 'x'
+    assert c_locals[0].type.spelling == 'int'
+    assert c_locals[0].children == 0
+    assert c_locals[1].name == 'y_v'
+    assert c_locals[1].type.spelling == 'char'
+    assert c_locals[1].children == 0
+    assert c_locals[2].name == 'y'
+    assert c_locals[2].type.spelling == 'char *'
+    assert c_locals[2].children == 1
+    assert c_locals[3].name == 'c'
+    assert c_locals[3].type.spelling == 'struct foo'
+    assert c_locals[3].children == 2
