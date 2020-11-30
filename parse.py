@@ -42,6 +42,7 @@ def local_vars(type, varname):
     if type.kind == TypeKind.ELABORATED:
         td = type.get_declaration()
         children = list(td.get_children())
+        # TODO: Test for missing struct declaration
         for fd in children:
             yield from local_vars(fd.type, fd.displayname)
         yield LocalVariable(type, varname, len(children))
@@ -86,31 +87,47 @@ def initializers(vars):
     for i, v in enumerate(vars):
         yield (declare(v), read_and_assign(i, v))
 
+def codegen(fn_name, param_names, inits):
+    decls, defs = zip(*inits)
+    joiner = '\n    '
+
+    print(
+        f'''
+int main() {{
+    // declare input variables
+    {joiner.join(decls)}
+    // prepare input variables
+    {joiner.join(defs)}
+    // call into segment
+    {fn_name}({", ".join(param_names)});
+}}
+'''
+    )
+
 def main():
     filename = 'main.c'
 
     index = clang.cindex.Index.create()
     tu = index.parse(filename)
-    print('Translation unit:', tu.spelling)
+    print('translation unit:', tu.spelling)
     
     cur = tu.cursor
 
-    funcdefs = find(cur, CursorKind.FUNCTION_DECL)
-    last_funcdef = max(funcdefs, key=lambda n: n.location.file.name == filename and n.location.line)
-    print(f'last: {pp(last_funcdef)}')
+    funcdecls = find(cur, CursorKind.FUNCTION_DECL)
+    target = max(funcdecls, key=lambda n: n.location.file.name == filename and n.location.line)
+    print(f'target function: {pp(target)}')
 
-    parmesan = list(find(last_funcdef, CursorKind.PARM_DECL))
+    inits = []
+    parmesan = list(find(target, CursorKind.PARM_DECL))
     for parm in parmesan:
         locals = list(local_vars(parm.type, parm.displayname))
-        print(parm.type.spelling, pp(parm), locals)
-        
-        inits = list(initializers(locals))
+        print(locals)
+        this_boy_inits = list(initializers(locals))
+        print(this_boy_inits)
+        inits += this_boy_inits
 
-        decls, defs = zip(*inits)
-        print(decls)
-        print(defs)
-
-    print(f'{last_funcdef.spelling}({", ".join(p.displayname for p in parmesan)})')
+    param_names = (p.displayname for p in parmesan)
+    codegen(target.spelling, param_names, inits)
 
 if __name__ == "__main__":
     main()
