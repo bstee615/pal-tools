@@ -51,6 +51,8 @@ def local_vars(type, varname):
         yield LocalVariable(type, varname, 1)
     elif type.kind == TypeKind.INT:
         yield LocalVariable(type, varname)
+    elif type.kind == TypeKind.UINT:
+        yield LocalVariable(type, varname)
     elif type.kind == TypeKind.CHAR_S:
         yield LocalVariable(type, varname)
     else:
@@ -74,6 +76,8 @@ def initializers(vars):
             return f'{v.name} = &{vars_so_far[-v.children].name};'
         elif v.type.kind == TypeKind.INT:
             return f'scanf("%d", &{v.name});'
+        elif v.type.kind == TypeKind.UINT:
+            return f'scanf("%u", &{v.name});'
         elif v.type.kind == TypeKind.CHAR_S:
             return f'scanf(" %c", &{v.name});'
         else:
