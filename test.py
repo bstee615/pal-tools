@@ -1,7 +1,7 @@
 import pytest
 import clang.cindex
 from clang.cindex import CursorKind
-from parse import find, local_vars
+from parse import find, initializers, local_vars
 
 @pytest.fixture
 def test_file():
@@ -55,16 +55,22 @@ def test_find(test_file):
     assert b_locals[0].children == 0
 
     c_locals = list(local_vars(c_decl.type, c_decl.displayname))
-    assert len(c_locals) == 4
+    assert len(c_locals) == 3
     assert c_locals[0].name == 'x'
     assert c_locals[0].type.spelling == 'int'
     assert c_locals[0].children == 0
-    assert c_locals[1].name == 'y_v'
-    assert c_locals[1].type.spelling == 'char'
+    assert c_locals[1].name == 'y'
+    assert c_locals[1].type.spelling == 'char *'
     assert c_locals[1].children == 0
-    assert c_locals[2].name == 'y'
-    assert c_locals[2].type.spelling == 'char *'
-    assert c_locals[2].children == 1
-    assert c_locals[3].name == 'c'
-    assert c_locals[3].type.spelling == 'struct foo'
-    assert c_locals[3].children == 2
+    assert c_locals[2].name == 'c'
+    assert c_locals[2].type.spelling == 'struct foo'
+    assert c_locals[2].children == 2
+
+    c_inits = list(initializers(c_locals))
+    assert len(c_inits) == 3
+    assert c_inits[0][0] == 'int x;'
+    assert 'atoi' in c_inits[0][1]
+    assert c_inits[1][0] == 'char * y;'
+    assert 'strcpy' in c_inits[1][1]
+    assert c_inits[2][0] == 'struct foo c;'
+    assert 'c.y = y;' in c_inits[2][1] and 'c.x = x;' in c_inits[2][1]
