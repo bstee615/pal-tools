@@ -7,6 +7,12 @@ Given a target function, harn generates a test harness that reads input variable
 The harness reads one value per line.
 See examples of reading ints, characters, and strings below.
 
+# Requirements
+
+- `clang`
+- `clang-format`
+- Python libclang wrapper: `pip3 install libclang`
+
 # Example
 
 `main.c` is an example program with two functions, `sum` and `body`.
