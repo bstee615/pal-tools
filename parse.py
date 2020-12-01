@@ -158,7 +158,7 @@ int main() {{
 // END test harness
 '''
 
-def generate_harness(infile):
+def generate_harness(infile, func_name):
     """
     Generate and return a test harness, a chunk of C code that defines a main method
     to initialize input variables and call the target function
@@ -171,7 +171,12 @@ def generate_harness(infile):
     cur = tu.cursor
 
     funcdecls = find(cur, CursorKind.FUNCTION_DECL)
-    target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name == infile else -1)
+    if func_name:
+        target = next((n for n in funcdecls if n.spelling == func_name), None)
+        if target is None:
+            raise Exception(f'no function named {func_name}')
+    else:
+        target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name == infile else -1)
     log.info(f'target function: {pp(target)}')
 
     inits = []
@@ -193,6 +198,7 @@ def get_args():
     parser.add_argument('input_file', help="Path to the input file")
     parser.add_argument('-o', '--output', help='Path to the output file', type=str, nargs=1)
     parser.add_argument('-f', '--format', help='Format the output file with clang-format', action="store_true")
+    parser.add_argument('-n', '--func-name', help='Target a specific function (defaults to the last function in the file)', type=str, nargs=1)
     parser.add_argument('-l', '--logs', help='Print informational logs to stdout', action="store_true")
     parser.add_argument('-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
 
@@ -207,11 +213,12 @@ def main():
     elif args.verbose:
         stdout_handler.setLevel(logging.DEBUG)
     else:
-        stdout_handler.setLevel(logging.CRITICAL)
+        stdout_handler.setLevel(logging.ERROR)
 
+    func_name = args.func_name[0] if args.func_name else None
     test_harness = ""
     try:
-        test_harness =  generate_harness(args.input_file)
+        test_harness =  generate_harness(args.input_file, func_name)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
         exit(1)
