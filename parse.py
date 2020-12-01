@@ -10,6 +10,14 @@ import argparse
 import shutil
 import subprocess
 import os
+import logging
+import sys
+
+log = logging.getLogger()
+stdout_handler = logging.StreamHandler(sys.stdout)
+verbose_fmt = logging.Formatter('%(levelname)s - %(message)s')
+stdout_handler.setFormatter(verbose_fmt)
+log.addHandler(stdout_handler)
 
 def pp(node):
     """
@@ -17,13 +25,12 @@ def pp(node):
     """
     return f'{node.displayname} ({node.kind}) [{node.location}]'
 
-def find(node, kind, verbose=False):
+def find(node, kind):
     """
     Return all node's descendants of a certain kind
     """
 
-    if verbose:
-        print(pp(node))
+    log.debug(f'find: walked node {pp(node)}')
 
     if node.kind == kind:
         yield node
@@ -156,59 +163,69 @@ def generate_harness(infile):
 
     index = clang.cindex.Index.create()
     tu = index.parse(infile)
-    print('translation unit:', tu.spelling)
+    log.info(f'translation unit: {tu.spelling}')
     
     cur = tu.cursor
 
     funcdecls = find(cur, CursorKind.FUNCTION_DECL)
     target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name == infile else -1)
-    print(f'target function: {pp(target)}')
+    log.info(f'target function: {pp(target)}')
 
     inits = []
     parmesan = list(find(target, CursorKind.PARM_DECL))
-    print(f'target function has {len(parmesan)} parameters')
+    log.info(f'target function has {len(parmesan)} parameters')
     for i, parm in enumerate(parmesan):
         locals = list(local_vars(parm.type, parm.displayname))
         this_boy_inits = list(initializers(locals))
         inits += this_boy_inits
-        print(f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
+        log.info(f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
         for l in locals:
-            print(f'local variable {l}')
+            log.debug(f'local variable {l}')
 
     param_names = (p.displayname for p in parmesan)
     return codegen(target.spelling, param_names, inits)
 
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input', help="Path to the input file")
+    parser.add_argument('input_file', help="Path to the input file")
     parser.add_argument('-o', "--output", help="Path to the output file", type=str, nargs=1)
     parser.add_argument('-f', "--format", help="Format the output file with clang-format", action="store_true")
+    parser.add_argument('-l', "--logs", help="Print informational logs to stdout", action="store_true")
+    parser.add_argument('-v', "--verbose", help="Print informational and diagnostic logs to stdout", action="store_true")
 
     return parser.parse_args()
 
 def main():
     args = get_args()
     outfile = args.output[0] if args.output else None
+    log.setLevel(logging.DEBUG)
+    if args.logs:
+        stdout_handler.setLevel(logging.INFO)
+    elif args.verbose:
+        stdout_handler.setLevel(logging.DEBUG)
+    else:
+        stdout_handler.setLevel(logging.CRITICAL)
 
-    test_harness =  generate_harness(args.input)
+    test_harness =  generate_harness(args.input_file)
 
-    with open(args.input, 'r') as f:
+    with open(args.input_file, 'r') as f:
         input_text = f.read()
     if '// BEGIN test harness' in input_text:
-        raise Exception('Test harness exists in the input file; please delete it')
-    raw_text = input_text + '\n' + test_harness
+        log.critical('Test harness exists in the input file; please delete it')
+        exit(1)
+    raw_text = input_text + '\n//END original file\n' + test_harness
 
     if outfile:
+        log.info(f'writing to output file {outfile}')
         with open(outfile, 'w') as f:
             f.write(raw_text)
-        
         if args.format:
             if shutil.which('clang-format'):
                 subprocess.check_call(['clang-format', outfile, '-i'])
             else:
-                print('WARNING: Requested format but clang-format not found')
+                log.warn('requested format but clang-format not found')
     else:
-        print('generated test harness:')
+        log.info('generated test harness:')
         if args.format:
             if shutil.which('clang-format'):
 
@@ -222,7 +239,7 @@ def main():
 
                 print(formatted_text)
             else:
-                print('WARNING: Requested format but clang-format not found')
+                log.info('requested format but clang-format not found')
         else:
             print(raw_text)
 
