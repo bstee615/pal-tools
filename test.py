@@ -1,7 +1,7 @@
 import pytest
 import clang.cindex
 from clang.cindex import CursorKind
-from parse import find, initializers, local_vars
+from harn import find, initializers, local_vars
 
 @pytest.fixture
 def test_file():

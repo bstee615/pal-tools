@@ -198,7 +198,7 @@ def get_args():
     parser.add_argument('input_file', help="Path to the input file")
     parser.add_argument('-o', '--output', help='Path to the output file', type=str, nargs=1)
     parser.add_argument('-f', '--format', help='Format the output file with clang-format', action="store_true")
-    parser.add_argument('-n', '--func-name', help='Target a specific function (defaults to the last function in the file)', type=str, nargs=1)
+    parser.add_argument('-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
     parser.add_argument('-l', '--logs', help='Print informational logs to stdout', action="store_true")
     parser.add_argument('-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
 
