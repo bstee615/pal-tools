@@ -148,19 +148,11 @@ int main() {{
 // END test harness
 '''
 
-def get_args():
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('filename', help="Path to the input file")
-    parser.add_argument('-o', "--output", help="Path to the output file", type=str, nargs=1)
-    parser.add_argument('-f', "--format", help="Format the output file with clang-format", action="store_true")
-
-    return parser.parse_args()
-
-def main():
-    args = get_args()
-    infile = args.filename
-    outfile = args.output[0] if args.output else None
-    should_format = args.format
+def generate_harness(infile):
+    """
+    Generate and return a test harness, a chunk of C code that defines a main method
+    to initialize input variables and call the target function
+    """
 
     index = clang.cindex.Index.create()
     tu = index.parse(infile)
@@ -184,24 +176,40 @@ def main():
             print(f'local variable {l}')
 
     param_names = (p.displayname for p in parmesan)
-    test_harness = codegen(target.spelling, param_names, inits)
+    return codegen(target.spelling, param_names, inits)
 
-    with open(infile, 'r') as f:
-        text = f.read()
-    raw_text = text + '\n' + test_harness
+def get_args():
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('input', help="Path to the input file")
+    parser.add_argument('-o', "--output", help="Path to the output file", type=str, nargs=1)
+    parser.add_argument('-f', "--format", help="Format the output file with clang-format", action="store_true")
+
+    return parser.parse_args()
+
+def main():
+    args = get_args()
+    outfile = args.output[0] if args.output else None
+
+    test_harness =  generate_harness(args.input)
+
+    with open(args.input, 'r') as f:
+        input_text = f.read()
+    if '// BEGIN test harness' in input_text:
+        raise Exception('Test harness exists in the input file; please delete it')
+    raw_text = input_text + '\n' + test_harness
 
     if outfile:
         with open(outfile, 'w') as f:
             f.write(raw_text)
         
-        if should_format:
+        if args.format:
             if shutil.which('clang-format'):
                 subprocess.check_call(['clang-format', outfile, '-i'])
             else:
                 print('WARNING: Requested format but clang-format not found')
     else:
         print('generated test harness:')
-        if should_format:
+        if args.format:
             if shutil.which('clang-format'):
 
                 tmp_filename = '/tmp/parse.py.fmt.c'
