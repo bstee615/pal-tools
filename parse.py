@@ -47,6 +47,9 @@ def local_vars(type, varname):
             yield from local_vars(fd.type, fd.displayname)
         yield LocalVariable(type, varname, len(children))
     elif type.kind == TypeKind.POINTER:
+        if type.spelling == 'char *':
+            yield LocalVariable(type, varname, 0)
+        else:
         # TODO: Currently inits all ptrs as single values. What about arrays?
         yield from local_vars(type.get_pointee(), f'{varname}_v')
         yield LocalVariable(type, varname, 1)
@@ -67,20 +70,47 @@ def initializers(vars):
     def declare(v):
         return f'{v.type.spelling} {v.name};'
         
+    def throwaway_getline(var_name, fmt):
+        """
+        Declare a string and string length variable, call getline, assign result then free the buffer
+        """
+
+        str_name = f'{var_name}_s'
+        strlen_name = f'{var_name}_sn'
+        return f'''
+// BEGIN read value for {var_name}
+{{
+char *{str_name}=NULL;
+size_t {strlen_name}=0;
+printf("{var_name}: ");
+getline(&{str_name}, &{strlen_name}, stdin);
+{fmt.format(var_name, str_name, strlen_name)} // provided line
+free({str_name});
+}}
+// END read value for {var_name}
+'''
+
     def read_and_assign(i, v):
         vars_so_far = vars[:i]
         if v.type.kind == TypeKind.ELABORATED:
-            for c in reversed(vars_so_far[:-v.children]):
-                return f'{v.name}.{c.name} = {c.name};'
+            assignments = '\n'.join(f'{v.name}.{c.name} = {c.name};' for c in reversed(vars_so_far[-v.children:]))
+            return f'''
+// BEGIN assign fields of {v.name}
+{assignments}
+// END assign fields of {v.name}
+'''
         elif v.type.kind == TypeKind.POINTER:
+            if v.type.spelling == 'char *':
+                return throwaway_getline(v.name, '{0} = malloc({2});\nstrcpy({0}, {1});')
+            else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
             return f'{v.name} = &{vars_so_far[-v.children].name};'
         elif v.type.kind == TypeKind.INT:
-            return f'scanf("%d", &{v.name});'
+            return throwaway_getline(v.name, '{0} = atoi({1});')
         elif v.type.kind == TypeKind.UINT:
-            return f'scanf("%u", &{v.name});'
+            return throwaway_getline(v.name, '{0} = strtoul({1}, NULL, 10);')
         elif v.type.kind == TypeKind.CHAR_S:
-            return f'scanf(" %c", &{v.name});'
+            return throwaway_getline(v.name, '{0} = {1}[0];')
         else:
             raise Exception('definitions unhandled kind', type.kind)
 
@@ -89,19 +119,28 @@ def initializers(vars):
 
 def codegen(fn_name, param_names, inits):
     decls, defs = zip(*inits)
-    joiner = '\n    '
+    joiner = '\n'
 
-    print('generated test harness:')
-    print(
-        f'''
+    return f'''
+// BEGIN test harness
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 int main() {{
-    // declare input variables
+// BEGIN declare input variables
     {joiner.join(decls)}
-    // prepare input variables
+// END declare input variables
+
+// BEGIN read input variables
     {joiner.join(defs)}
-    // call into segment
+// END read input variables
+
+// BEGIN call into segment
     {fn_name}({", ".join(param_names)});
+// END call into segment
 }}
+// END test harness
 '''
     )
 
