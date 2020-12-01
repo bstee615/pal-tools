@@ -8,11 +8,16 @@ struct f
     char *cp;
 };
 
-int sum(struct f *myf);
-
-int sum(struct f *myf)
+int sum(int x, unsigned int y)
 {
-    printf("%d %u %c %s\n", myf->x, myf->y, myf->c, myf->cp);
-    int a = myf->x;
-    return a;
+    unsigned int z = x+y;
+    printf("%d + %u = %u\n", x, y, z);
+    return z;
+}
+
+int body(struct f *myf)
+{
+    printf("params: %d %u %c %s\n", myf->x, myf->y, myf->c, myf->cp);
+    int z = sum(myf->x, myf->y);
+    return z;
 }
