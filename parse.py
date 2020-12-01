@@ -147,13 +147,13 @@ int main() {{
 {defs}
 // END read input variables
 
-// BEGIN cleanup input variables
-{cleanups}
-// END cleanup input variables
-
 // BEGIN call into segment
 {fn_name}({", ".join(param_names)});
 // END call into segment
+
+// BEGIN cleanup input variables
+{cleanups}
+// END cleanup input variables
 }}
 // END test harness
 '''
