@@ -1,15 +1,5 @@
 #include <stdio.h>
-
-struct f
-{
-    int x;
-    unsigned int y;
-    char c;
-    char *cp;
-};
-
-int sum(int x, unsigned int y);
-int body(struct f *myf);
+#include "main.h"
 
 int body(struct f *myf)
 {
