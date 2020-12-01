@@ -3,22 +3,16 @@
 struct f
 {
     int x;
+    unsigned int y;
     char c;
-    char **cp;
+    char *cp;
 };
 
-int sum(struct f *myf, char y);
+int sum(struct f *myf);
 
-int main()
+int sum(struct f *myf)
 {
-    struct f myf;
-    myf.x = 3;
-    int s = sum(&myf, 4);
-    printf("Hello, world! %d\n", s);
-}
-
-int sum(struct f *myf, char y)
-{
-    int a = myf->x + y;
+    printf("%d %u %c %s\n", myf->x, myf->y, myf->c, myf->cp);
+    int a = myf->x;
     return a;
 }
