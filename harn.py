@@ -12,6 +12,7 @@ import subprocess
 import os
 import logging
 import sys
+import re
 
 log = logging.getLogger()
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -158,14 +159,15 @@ int main() {{
 // END test harness
 '''
 
-def generate_harness(infile, func_name):
+def generate_harness(infile, func_name, clang_flags):
     """
     Generate and return a test harness, a chunk of C code that defines a main method
     to initialize input variables and call the target function
     """
+    log.info(f'{clang_flags=}')
 
     index = clang.cindex.Index.create()
-    tu = index.parse(infile)
+    tu = index.parse(infile, args=clang_flags)
     log.info(f'translation unit: {tu.spelling}')
     
     cur = tu.cursor
@@ -197,6 +199,9 @@ def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('input_file', help="Path to the input file")
     parser.add_argument('-o', '--output', help='Path to the output file', type=str, nargs=1)
+    parser.add_argument('-c', '--clang_flags', help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
+    parser.add_argument('-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
+    
     parser.add_argument('-f', '--format', help='Format the output file with clang-format', action="store_true")
     parser.add_argument('-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
     parser.add_argument('-l', '--logs', help='Print informational logs to stdout', action="store_true")
@@ -216,9 +221,16 @@ def main():
         stdout_handler.setLevel(logging.ERROR)
 
     func_name = args.func_name[0] if args.func_name else None
+    clang_flags = args.clang_flags[0].split() if args.clang_flags else []
+    makefile = args.makefile[0] if args.makefile else None
+    if makefile:
+        with open(makefile, 'r') as f:
+            for line in f.readlines():
+                if m := re.search(r'CFLAGS:=(.*)', line):
+                    clang_flags += m.group(1).split()
     test_harness = ""
     try:
-        test_harness =  generate_harness(args.input_file, func_name)
+        test_harness =  generate_harness(args.input_file, func_name, clang_flags)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
         exit(1)
