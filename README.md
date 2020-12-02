@@ -13,6 +13,16 @@ See examples of reading ints, characters, and strings below.
 - `clang-format`
 - Python libclang wrapper: `pip3 install libclang`
 
+# Local variable naming
+
+Given an example input parameter `int *x`, harn will generate 4 local variables.
+This is the example which shows all the different kinds of variables, as you will see.
+- Of course, generate `int *x` as the parameter to the function.
+- Because `x` is an `int *`, generate `int x_v`, which stands for "value of `x`".
+- To read a value for `x_v`, two "throwaway" variables are generated:
+  - `x_v_s` stands for "string version of `x_v`", meaning this is the string that is read in to be converted to the value for `x_v`.
+  - `x_v_sn` stands for "length of the string version of `x_v`", to be assigned by `getline()`. This is used to `strcpy` string values.
+
 # Example
 
 `main.c` is an example program with two functions, `sum` and `body`.
