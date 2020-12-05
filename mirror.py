@@ -47,7 +47,7 @@ def main():
     index = clang.cindex.Index.create()
     seg_tu = index.parse('seg/main.c')
     seg_cur = seg_tu.cursor
-    seg_target = select_target(seg_cur, target_name='helium_sum')
+    seg_target = select_target(seg_cur, target_name='helium_body')
     parms = find(seg_target, CursorKind.PARM_DECL)
     
     orig_tu = index.parse('orig/main.c')
@@ -87,18 +87,30 @@ def gen_printfs(parms):
     """
     Generate printf statements for a set of function parmameters, otherwise leave a to do comment
     """
-    def genny(p):
-        if p.type.kind == TypeKind.INT or \
-            p.type.kind == TypeKind.SHORT or \
-            p.type.kind == TypeKind.LONG or \
-            p.type.kind == TypeKind.LONGLONG or \
-            p.type.kind == TypeKind.INT128:
-            yield f'printf("benjis:{p.spelling}:%d\\n", {p.spelling});'
+    def genny(name, t):
+        yield f'// name {name} type kind {t.kind}\n'
+        if t.kind == TypeKind.INT or \
+            t.kind == TypeKind.SHORT or \
+            t.kind == TypeKind.LONG or \
+            t.kind == TypeKind.LONGLONG or \
+            t.kind == TypeKind.INT128:
+            yield f'printf("benjis:{name}:%d\\n", {name});\n'
+        elif t.kind == TypeKind.UINT or \
+            t.kind == TypeKind.ULONG or \
+            t.kind == TypeKind.ULONGLONG or \
+            t.kind == TypeKind.UINT128:
+            yield f'printf("benjis:{name}:%u\\n", {name});\n'
+        elif t.kind == TypeKind.ELABORATED:
+            for c in t.get_fields():
+                yield from genny(f'{name}.{c.spelling}', c.type)
+        elif t.kind == TypeKind.POINTER:
+            # TODO: only single pointer case
+            yield from genny(f'(*{name})', t.get_pointee())
         else:
-            yield f'// TODO benjis: print {p.spelling}\n'
+            yield f'// TODO benjis: print {name}\n'
 
     for p in parms:
-        yield from genny(p)
+        yield from genny(p.spelling, p.type)
 
 if __name__ == "__main__":
     main()
