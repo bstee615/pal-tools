@@ -109,6 +109,8 @@ def gen_printfs(parms):
             else:
                 # TODO: only single pointer case
                 yield from genny(f'(*{name})', t.get_pointee())
+        elif t.kind == TypeKind.CHAR_S:
+            yield f'printf("benjis:{name}:%c\\n", {name});\n'
         else:
             yield f'// TODO benjis: print {name}\n'
 
