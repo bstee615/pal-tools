@@ -52,18 +52,24 @@ def main():
     
     orig_tu = index.parse('orig/main.c')
     orig_cur = orig_tu.cursor
-    orig_target = next(filter(lambda f: f.spelling in seg_target.spelling, find(orig_cur, CursorKind.FUNCTION_DECL)))
+    orig_target = next(filter(lambda f: is_the_same(f, seg_target), find(orig_cur, CursorKind.FUNCTION_DECL)))
     orig_target_def = orig_target.get_definition()
     first_stmt = next(filter(lambda c: c.kind.is_statement(), orig_target_def.get_children()))
     first_stmt_file, first_stmt_line = loc(first_stmt, link=False)
     with open(first_stmt_file, 'r') as f:
         fromlines = f.readlines()
 
-    printfs = [f'// TODO benjis: print {p.spelling}\n' for p in parms]
+    printfs = list(gen_printfs(parms))
     tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
 
     diff = difflib.unified_diff(fromlines, tolines, fromfile=first_stmt_file, tofile=first_stmt_file)
     print(''.join(diff))
+
+def is_the_same(orig_cursor, seg_cursor):
+    """
+    Compare a cursor from the original and the segment to see if they refer to the same function in the project
+    """
+    return orig_cursor.spelling in seg_cursor.spelling
 
 def select_target(cur, target_name=None):
     """
@@ -76,6 +82,23 @@ def select_target(cur, target_name=None):
     else:
         # Select the last function to occur in a .c file
         return max(func_decls, key=lambda f: f.location.line if '.c' in f.location.file.name else -1)
+
+def gen_printfs(parms):
+    """
+    Generate printf statements for a set of function parmameters, otherwise leave a to do comment
+    """
+    def genny(p):
+        if p.type.kind == TypeKind.INT or \
+            p.type.kind == TypeKind.SHORT or \
+            p.type.kind == TypeKind.LONG or \
+            p.type.kind == TypeKind.LONGLONG or \
+            p.type.kind == TypeKind.INT128:
+            yield f'printf("benjis:{p.spelling}:%d\\n", {p.spelling});'
+        else:
+            yield f'// TODO benjis: print {p.spelling}\n'
+
+    for p in parms:
+        yield from genny(p)
 
 if __name__ == "__main__":
     main()
