@@ -104,8 +104,11 @@ def gen_printfs(parms):
             for c in t.get_fields():
                 yield from genny(f'{name}.{c.spelling}', c.type)
         elif t.kind == TypeKind.POINTER:
-            # TODO: only single pointer case
-            yield from genny(f'(*{name})', t.get_pointee())
+            if t.get_pointee().kind == TypeKind.CHAR_S:
+                yield f'printf("benjis:{name}:%s\\n", {name});\n'
+            else:
+                # TODO: only single pointer case
+                yield from genny(f'(*{name})', t.get_pointee())
         else:
             yield f'// TODO benjis: print {name}\n'
 
