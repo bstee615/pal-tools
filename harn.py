@@ -19,6 +19,7 @@ stdout_handler = logging.StreamHandler(sys.stdout)
 verbose_fmt = logging.Formatter('%(levelname)s - %(message)s')
 stdout_handler.setFormatter(verbose_fmt)
 log.addHandler(stdout_handler)
+log.setLevel(logging.DEBUG)
 
 def pp(node):
     """
@@ -212,7 +213,6 @@ def get_args():
 def main():
     args = get_args()
     outfile = args.output[0] if args.output else None
-    log.setLevel(logging.DEBUG)
     if args.logs:
         stdout_handler.setLevel(logging.INFO)
     elif args.verbose:
