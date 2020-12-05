@@ -47,7 +47,7 @@ def main():
     index = clang.cindex.Index.create()
     seg_tu = index.parse('seg/main.c')
     seg_cur = seg_tu.cursor
-    seg_target = max(find(seg_cur, CursorKind.FUNCTION_DECL), key=lambda f: f.location.line if 'main.c' in f.location.file.name else -1)
+    seg_target = select_target(seg_cur, target_name='helium_sum')
     parms = find(seg_target, CursorKind.PARM_DECL)
     
     orig_tu = index.parse('orig/main.c')
@@ -64,6 +64,18 @@ def main():
 
     diff = difflib.unified_diff(fromlines, tolines, fromfile=first_stmt_file, tofile=first_stmt_file)
     print(''.join(diff))
+
+def select_target(cur, target_name=None):
+    """
+    Select a target function from a cursor
+    """
+    func_decls = find(cur, CursorKind.FUNCTION_DECL)
+    if target_name:
+        # Select the function matching a name
+        return next(filter(lambda f: f.spelling == target_name, func_decls))
+    else:
+        # Select the last function to occur in a .c file
+        return max(func_decls, key=lambda f: f.location.line if '.c' in f.location.file.name else -1)
 
 if __name__ == "__main__":
     main()
