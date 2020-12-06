@@ -51,10 +51,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('segment_file')
     parser.add_argument('original_file')
-    parser.add_argument('-l', '--log-level')
-    parser.add_argument('-v', '--verbose', action='store_true')
-    parser.add_argument('-a', '--array', action='append', default=[])
-    parser.add_argument('-t', '--target')
+    parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs. Should be used in tandem with "-l DEBUG"')
+    parser.add_argument('-a', '--array', action='append', default=[], help='Assign length expressions for array variables. Length expressions are in the format "array:length", where array is the name of the array and length is a C expression to be evaluated at runtime, typically a number or variable reference')
+    parser.add_argument('-t', '--target', help='Target function in the segment')
     args = parser.parse_args()
 
     if args.log_level:
