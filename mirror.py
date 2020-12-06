@@ -121,9 +121,10 @@ def gen_printfs(parms, arrays={}):
                 for key in arrays:
                     if key == name:
                         array = True
-                        yield f'for(int benjis_i = 0; benjis_i < {arrays[name]}; benjis_i ++)'
+                        i_name = f'{name}_benjis_i'
+                        yield f'for(int {i_name} = 0; {i_name} < {arrays[name]}; {i_name} ++)'
                         yield '{'
-                        yield from genny(f'{name}[benjis_i]', t.get_pointee())
+                        yield from genny(f'{name}[{i_name}]', t.get_pointee())
                         yield '}'
                 if not array:
                     yield from genny(f'(*{name})', t.get_pointee())
