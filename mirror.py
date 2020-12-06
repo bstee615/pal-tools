@@ -80,10 +80,13 @@ def main():
     seg_cur = seg_tu.cursor
     seg_target = select_target(seg_cur, target_name=args.target)
     parms = find(seg_target, CursorKind.PARM_DECL)
+
+    log.debug(f'target: {pp(seg_target)}')
     
     orig_tu = index.parse(orig_c)
     orig_cur = orig_tu.cursor
-    orig_target = next(filter(lambda f: is_the_same(f, seg_target), find(orig_cur, CursorKind.FUNCTION_DECL)))
+    orig_funcdecls = list(find(orig_cur, CursorKind.FUNCTION_DECL))
+    orig_target = next(filter(lambda f: is_the_same(f, seg_target), orig_funcdecls))
     orig_target_def = orig_target.get_definition()
     first_stmt = next(filter(lambda c: c.kind.is_statement(), orig_target_def.get_children()))
     first_stmt_file, first_stmt_line = loc(first_stmt, link=False)
@@ -150,7 +153,7 @@ def gen_printfs(parms, arrays={}):
         elif t.kind == TypeKind.ELABORATED:
             if t not in stack:
                 log.debug(f'{len(list(t.get_fields()))} fields')
-            for c in t.get_fields():
+                for c in t.get_fields():
                     yield from genny(f'{name}.{c.spelling}', c.type, stack + [t])
             else:
                 yield f'// TODO benjis: print recursive struct member {name}'
