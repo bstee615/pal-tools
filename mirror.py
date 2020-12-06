@@ -37,7 +37,7 @@ def find(node, kind):
     """
 
     if verbose:
-    log.debug(f'find: walked node {pp(node)}')
+        log.debug(f'find: walked node {pp(node)}')
 
     if node.kind == kind:
         yield node
@@ -54,6 +54,7 @@ def main():
     parser.add_argument('-l', '--log-level')
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-a', '--array', action='append', default=[])
+    parser.add_argument('-t', '--target')
     args = parser.parse_args()
 
     if args.log_level:
@@ -72,7 +73,7 @@ def main():
     index = clang.cindex.Index.create()
     seg_tu = index.parse(seg_c)
     seg_cur = seg_tu.cursor
-    seg_target = select_target(seg_cur)
+    seg_target = select_target(seg_cur, target_name=args.target)
     parms = find(seg_target, CursorKind.PARM_DECL)
     
     orig_tu = index.parse(orig_c)
@@ -112,7 +113,7 @@ def select_target(cur, target_name=None):
     if target_name:
         # Select the function matching a name
         try:
-        return next(filter(lambda f: f.spelling == target_name, func_decls))
+            return next(filter(lambda f: f.spelling == target_name, func_decls))
         except:
             log.exception(f'could not find target function with name {target_name}')
             raise
