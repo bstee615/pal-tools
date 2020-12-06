@@ -81,7 +81,11 @@ def select_target(cur, target_name=None):
     func_decls = find(cur, CursorKind.FUNCTION_DECL)
     if target_name:
         # Select the function matching a name
+        try:
         return next(filter(lambda f: f.spelling == target_name, func_decls))
+        except:
+            log.exception(f'could not find target function with name {target_name}')
+            raise
     else:
         # Select the last function to occur in a .c file
         return max(func_decls, key=lambda f: f.location.line if '.c' in f.location.file.name else -1)
