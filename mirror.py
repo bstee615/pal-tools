@@ -88,7 +88,14 @@ def main():
     printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
     tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
 
-    diff = difflib.unified_diff(fromlines, tolines, fromfile=first_stmt_file, tofile=first_stmt_file)
+    patchfile = first_stmt_file
+    for fi, fp in enumerate(first_stmt_file.split('/'), start=1):
+        for sp in seg_c.split('/'):
+            if fp == sp:
+                patchfile = '/'.join(first_stmt_file.split('/')[fi:])
+                log.debug(f'patching {patchfile}')
+
+    diff = difflib.unified_diff(fromlines, tolines, fromfile=patchfile, tofile=patchfile)
     print(''.join(diff))
 
 def is_the_same(orig_cursor, seg_cursor):
