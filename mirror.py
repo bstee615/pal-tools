@@ -59,7 +59,10 @@ def main():
     with open(first_stmt_file, 'r') as f:
         fromlines = f.readlines()
 
-    printfs = list(gen_printfs(parms))
+    arrays = {
+        "myf": 3,
+    }
+    printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
     tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
 
     diff = difflib.unified_diff(fromlines, tolines, fromfile=first_stmt_file, tofile=first_stmt_file)
@@ -83,36 +86,44 @@ def select_target(cur, target_name=None):
         # Select the last function to occur in a .c file
         return max(func_decls, key=lambda f: f.location.line if '.c' in f.location.file.name else -1)
 
-def gen_printfs(parms):
+def gen_printfs(parms, arrays={}):
     """
     Generate printf statements for a set of function parmameters, otherwise leave a to do comment
     """
     def genny(name, t):
-        yield f'// name {name} type kind {t.kind}\n'
+        yield f'// name {name} type kind {t.kind}'
         if t.kind == TypeKind.INT or \
             t.kind == TypeKind.SHORT or \
             t.kind == TypeKind.LONG or \
             t.kind == TypeKind.LONGLONG or \
             t.kind == TypeKind.INT128:
-            yield f'printf("benjis:{name}:%d\\n", {name});\n'
+            yield f'printf("benjis:{name}:%d\\n", {name});'
         elif t.kind == TypeKind.UINT or \
             t.kind == TypeKind.ULONG or \
             t.kind == TypeKind.ULONGLONG or \
             t.kind == TypeKind.UINT128:
-            yield f'printf("benjis:{name}:%u\\n", {name});\n'
+            yield f'printf("benjis:{name}:%u\\n", {name});'
         elif t.kind == TypeKind.ELABORATED:
             for c in t.get_fields():
                 yield from genny(f'{name}.{c.spelling}', c.type)
         elif t.kind == TypeKind.POINTER:
             if t.get_pointee().kind == TypeKind.CHAR_S:
-                yield f'printf("benjis:{name}:%s\\n", {name});\n'
+                yield f'printf("benjis:{name}:%s\\n", {name});'
             else:
-                # TODO: only single pointer case
-                yield from genny(f'(*{name})', t.get_pointee())
+                array = False
+                for key in arrays:
+                    if key == name:
+                        array = True
+                        yield f'for(int benjis_i = 0; benjis_i < {arrays[name]}; benjis_i ++)'
+                        yield '{'
+                        yield from genny(f'{name}[benjis_i]', t.get_pointee())
+                        yield '}'
+                if not array:
+                    yield from genny(f'(*{name})', t.get_pointee())
         elif t.kind == TypeKind.CHAR_S:
-            yield f'printf("benjis:{name}:%c\\n", {name});\n'
+            yield f'printf("benjis:{name}:%c\\n", {name});'
         else:
-            yield f'// TODO benjis: print {name}\n'
+            yield f'// TODO benjis: print {name}'
 
     for p in parms:
         yield from genny(p.spelling, p.type)
