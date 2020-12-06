@@ -135,6 +135,9 @@ def gen_printfs(parms, arrays={}):
     Generate printf statements for a set of function parmameters, otherwise leave a to do comment
     """
     def genny(name, t, stack=[]):
+        if t.kind == TypeKind.TYPEDEF:
+            t = t.get_canonical()
+
         yield f'// name {name} type kind {t.kind}'
         log.debug(f'name {name} type kind {t.kind}')
         log.debug(f'stack: {stack}')
