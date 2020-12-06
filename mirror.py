@@ -5,7 +5,7 @@ from clang.cindex import CursorKind, TypeKind
 import logging
 import sys
 import difflib
-from pathlib import Path
+import argparse
 
 log = logging.getLogger()
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -13,6 +13,8 @@ verbose_fmt = logging.Formatter('%(levelname)s - %(message)s')
 stdout_handler.setFormatter(verbose_fmt)
 log.addHandler(stdout_handler)
 log.setLevel(logging.DEBUG)
+
+verbose = False
 
 def pp(node):
     """
@@ -34,6 +36,7 @@ def find(node, kind):
     Return all node's descendants of a certain kind
     """
 
+    if verbose:
     log.debug(f'find: walked node {pp(node)}')
 
     if node.kind == kind:
@@ -45,14 +48,33 @@ def find(node, kind):
 def main():
     log.setLevel(logging.INFO)
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('segment_file')
+    parser.add_argument('original_file')
+    parser.add_argument('-l', '--log-level')
+    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-a', '--array', action='append', default=[])
+    args = parser.parse_args()
+
+    if args.log_level:
+        log.setLevel(args.log_level)
+        log.debug(f'setting log level to {args.log_level}')
+
+    seg_c = args.segment_file
+    orig_c = args.original_file
+    log.debug(f'segment: {seg_c}, original: {orig_c}')
+
+    if args.verbose:
+        global verbose
+        verbose = True
+        log.debug(f'verbose logging enabled')
+
     index = clang.cindex.Index.create()
-    seg_tu = index.parse('seg/gzip/BufferOverflow/rkttmp15756267731575626773139/main.c')
+    seg_tu = index.parse(seg_c)
     seg_cur = seg_tu.cursor
-    seg_target = select_target(seg_cur, target_name='helium_main')
+    seg_target = select_target(seg_cur)
     parms = find(seg_target, CursorKind.PARM_DECL)
     
-    orig = Path('orig/gzip')
-    orig_c = orig / 'src' / 'gzip.c'
     orig_tu = index.parse(orig_c)
     orig_cur = orig_tu.cursor
     orig_target = next(filter(lambda f: is_the_same(f, seg_target), find(orig_cur, CursorKind.FUNCTION_DECL)))
@@ -62,9 +84,7 @@ def main():
     with open(first_stmt_file, 'r') as f:
         fromlines = f.readlines()
 
-    arrays = {
-        "myf": 3,
-    }
+    arrays = dict(a.split(':') for a in args.array)
     printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
     tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
 
