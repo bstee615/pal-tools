@@ -131,8 +131,11 @@ def gen_printfs(parms, arrays={}):
     """
     Generate printf statements for a set of function parmameters, otherwise leave a to do comment
     """
-    def genny(name, t):
+    def genny(name, t, stack=[]):
         yield f'// name {name} type kind {t.kind}'
+        log.debug(f'name {name} type kind {t.kind}')
+        log.debug(f'stack: {stack}')
+
         if t.kind == TypeKind.INT or \
             t.kind == TypeKind.SHORT or \
             t.kind == TypeKind.LONG or \
@@ -145,8 +148,12 @@ def gen_printfs(parms, arrays={}):
             t.kind == TypeKind.UINT128:
             yield f'printf("benjis:{name}:%u\\n", {name});'
         elif t.kind == TypeKind.ELABORATED:
+            if t not in stack:
+                log.debug(f'{len(list(t.get_fields()))} fields')
             for c in t.get_fields():
-                yield from genny(f'{name}.{c.spelling}', c.type)
+                    yield from genny(f'{name}.{c.spelling}', c.type, stack + [t])
+            else:
+                yield f'// TODO benjis: print recursive struct member {name}'
         elif t.kind == TypeKind.POINTER:
             if t.get_pointee().kind == TypeKind.CHAR_S:
                 yield f'printf("benjis:{name}:%s\\n", {name});'
@@ -158,10 +165,10 @@ def gen_printfs(parms, arrays={}):
                         i_name = f'{name}_benjis_i'
                         yield f'for(int {i_name} = 0; {i_name} < {arrays[name]}; {i_name} ++)'
                         yield '{'
-                        yield from genny(f'{name}[{i_name}]', t.get_pointee())
+                        yield from genny(f'{name}[{i_name}]', t.get_pointee(), stack + [t])
                         yield '}'
                 if not array:
-                    yield from genny(f'(*{name})', t.get_pointee())
+                    yield from genny(f'(*{name})', t.get_pointee(), stack + [t])
         elif t.kind == TypeKind.CHAR_S:
             yield f'printf("benjis:{name}:%c\\n", {name});'
         else:
