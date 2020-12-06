@@ -177,6 +177,13 @@ def gen_printfs(parms, arrays={}):
                     yield from genny(f'(*{name})', t.get_pointee(), stack + [t])
         elif t.kind == TypeKind.CHAR_S:
             yield f'printf("benjis:{name}:%c\\n", {name});'
+        elif t.kind == TypeKind.CONSTANTARRAY:
+            size = t.get_array_size() # bless up
+            i_name = f'{name}_benjis_i'
+            yield f'for(int {i_name} = 0; {i_name} < {size}; {i_name} ++)'
+            yield '{'
+            yield from genny(f'{name}[{i_name}]', t.get_array_element_type(), stack + [t])
+            yield '}'
         else:
             yield f'// TODO benjis: print {name}'
 
