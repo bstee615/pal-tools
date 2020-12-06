@@ -90,8 +90,9 @@ def select_target(cur, target_name=None):
             log.exception(f'could not find target function with name {target_name}')
             raise
     else:
-        # Select the last function to occur in a .c file
-        return max(func_decls, key=lambda f: f.location.line if '.c' in f.location.file.name else -1)
+        # Select the last eligible function based on heuristic
+        eligible = filter(lambda f: '.c' in f.location.file.name and f.spelling != 'main', func_decls)
+        return max(eligible, key=lambda f: f.location.line)
 
 def gen_printfs(parms, arrays={}):
     """
