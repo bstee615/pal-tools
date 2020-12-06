@@ -5,6 +5,7 @@ from clang.cindex import CursorKind, TypeKind
 import logging
 import sys
 import difflib
+from pathlib import Path
 
 log = logging.getLogger()
 stdout_handler = logging.StreamHandler(sys.stdout)
@@ -45,12 +46,14 @@ def main():
     log.setLevel(logging.INFO)
 
     index = clang.cindex.Index.create()
-    seg_tu = index.parse('seg/main.c')
+    seg_tu = index.parse('seg/gzip/BufferOverflow/rkttmp15756267731575626773139/main.c')
     seg_cur = seg_tu.cursor
-    seg_target = select_target(seg_cur, target_name='helium_body')
+    seg_target = select_target(seg_cur, target_name='helium_main')
     parms = find(seg_target, CursorKind.PARM_DECL)
     
-    orig_tu = index.parse('orig/main.c')
+    orig = Path('orig/gzip')
+    orig_c = orig / 'src' / 'gzip.c'
+    orig_tu = index.parse(orig_c)
     orig_cur = orig_tu.cursor
     orig_target = next(filter(lambda f: is_the_same(f, seg_target), find(orig_cur, CursorKind.FUNCTION_DECL)))
     orig_target_def = orig_target.get_definition()
