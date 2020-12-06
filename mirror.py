@@ -55,6 +55,7 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs. Should be used in tandem with "-l DEBUG"')
     parser.add_argument('-a', '--array', action='append', default=[], help='Assign length expressions for array variables. Length expressions are in the format "array:length", where array is the name of the array and length is a C expression to be evaluated at runtime, typically a number or variable reference')
     parser.add_argument('-t', '--target', help='Target function in the segment')
+    parser.add_argument('-c', '--clang-args', help='Arguments to clang (e.g. -I..., -W...)', default='')
     args = parser.parse_args()
 
     if args.log_level:
@@ -65,13 +66,17 @@ def main():
     orig_c = args.original_file
     log.debug(f'segment: {seg_c}, original: {orig_c}')
 
+    clang_args = args.clang_args.split()
+    if clang_args:
+        log.debug(f' provided clang args: {clang_args}')
+
     if args.verbose:
         global verbose
         verbose = True
         log.debug(f'verbose logging enabled')
 
     index = clang.cindex.Index.create()
-    seg_tu = index.parse(seg_c)
+    seg_tu = index.parse(seg_c, args=clang_args)
     seg_cur = seg_tu.cursor
     seg_target = select_target(seg_cur, target_name=args.target)
     parms = find(seg_target, CursorKind.PARM_DECL)
