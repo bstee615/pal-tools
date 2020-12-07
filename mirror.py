@@ -114,7 +114,7 @@ def is_the_same(orig_cursor, seg_cursor):
     """
     Compare a cursor from the original and the segment to see if they refer to the same function in the project
     """
-    return orig_cursor.spelling in seg_cursor.spelling
+    return seg_cursor.spelling == f'helium_{orig_cursor.spelling}'
 
 def select_target(cur, target_name=None):
     """
