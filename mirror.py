@@ -20,7 +20,10 @@ def pp(node):
     """
     Return str of node for pretty print
     """
-    return f'{node.displayname} ({node.kind}) [{node.location}]'
+    try:
+        return f'{node.spelling} ({node.kind}) [{node.location}]'
+    except:
+        return f'{node.spelling} ({node.kind})'
 
 def loc(cur, link=True):
     """
