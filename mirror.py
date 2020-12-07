@@ -156,7 +156,7 @@ def gen_printfs(parms, arrays={}):
             t.kind == TypeKind.ULONGLONG or \
             t.kind == TypeKind.UINT128:
             yield f'printf("benjis:{name}:%u\\n", {name});'
-        elif t.kind == TypeKind.ELABORATED:
+        elif t.kind == TypeKind.ELABORATED or t.kind == TypeKind.RECORD:
             if t not in stack:
                 log.debug(f'{len(list(t.get_fields()))} fields')
                 for c in t.get_fields():
