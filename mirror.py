@@ -173,7 +173,7 @@ def gen_printfs(parms, arrays={}):
                 for key in arrays:
                     if key == name:
                         array = True
-                        i_name = f'{name}_benjis_i'
+                        i_name = f'{name.replace(".", "_").replace("*", "_").replace("(", "_").replace(")", "_")}_benjis_i'
                         yield f'for(int {i_name} = 0; {i_name} < {arrays[name]}; {i_name} ++)'
                         yield '{'
                         yield from genny(f'{name}[{i_name}]', t.get_pointee(), stack + [t])
@@ -191,7 +191,7 @@ def gen_printfs(parms, arrays={}):
             yield f'printf("benjis:{name}:%c\\n", {name});'
         elif t.kind == TypeKind.CONSTANTARRAY:
             size = t.get_array_size() # bless up
-            i_name = f'{name}_benjis_i'
+            i_name = f'{name.replace(".", "_").replace("*", "_").replace("(", "_").replace(")", "_")}_benjis_i'
             yield f'for(int {i_name} = 0; {i_name} < {size}; {i_name} ++)'
             yield '{'
             yield from genny(f'{name}[{i_name}]', t.get_array_element_type(), stack + [t])
