@@ -164,6 +164,8 @@ def gen_printfs(parms, arrays={}):
             else:
                 yield f'// TODO benjis: print recursive struct member {name}'
         elif t.kind == TypeKind.POINTER:
+            yield f'if ({name}) {{'
+
             if t.get_pointee().kind == TypeKind.CHAR_S:
                 yield f'printf("benjis:{name}:%s\\n", {name});'
             else:
@@ -178,6 +180,13 @@ def gen_printfs(parms, arrays={}):
                         yield '}'
                 if not array:
                     yield from genny(f'(*{name})', t.get_pointee(), stack + [t])
+
+            yield f'}}'
+            yield f'else {{'
+            yield f'printf("benjis:{name}:(null)\\n");'
+            yield f'}}'
+        elif t.kind == TypeKind.ENUM:
+            yield f'printf("benjis:{name}:%d\\n", {name});'
         elif t.kind == TypeKind.CHAR_S:
             yield f'printf("benjis:{name}:%c\\n", {name});'
         elif t.kind == TypeKind.CONSTANTARRAY:
