@@ -82,7 +82,7 @@ def main():
     seg_tu = index.parse(seg_c, args=clang_args)
     seg_cur = seg_tu.cursor
     seg_target = select_target(seg_cur, target_name=args.target)
-    parms = find(seg_target, CursorKind.PARM_DECL)
+    parms = list(seg_target.get_arguments())
 
     log.debug(f'target: {pp(seg_target)}')
     
@@ -97,6 +97,7 @@ def main():
         fromlines = f.readlines()
 
     arrays = dict(a.split(':') for a in args.array)
+    log.debug(f'{len(parms)} parameters')
     printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
     tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
 
@@ -143,7 +144,7 @@ def gen_printfs(parms, arrays={}):
 
         yield f'// name {name} type kind {t.kind}'
         log.debug(f'name {name} type kind {t.kind}')
-        log.debug(f'stack: {stack}')
+        log.debug(f'stack: {[pp(s) for s in stack]}')
 
         if t.kind == TypeKind.INT or \
             t.kind == TypeKind.SHORT or \
