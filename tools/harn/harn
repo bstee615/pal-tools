@@ -1,4 +1,0 @@
-#!/bin/python3
-
-from harn import main
-main()
