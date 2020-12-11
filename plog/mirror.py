@@ -1,5 +1,4 @@
-
-import clang.cindex
+from nodeutils import find, parse, pp
 from clang.cindex import CursorKind, TypeKind
 
 import logging
@@ -16,50 +15,10 @@ log.setLevel(logging.DEBUG)
 
 verbose = False
 
-def pp(node):
-    """
-    Return str of node for pretty print
-    """
-    try:
-        return f'{node.spelling} ({node.kind}) [{node.location}]'
-    except:
-        return f'{node.spelling} ({node.kind})'
-
-def loc(cur, link=True):
-    """
-    Return file location of cursor
-    """
-    if link:
-        return f'{cur.location.file.name}:{cur.location.line}'
-    else:
-        return cur.location.file.name, cur.location.line
-
-def find(node, kind):
-    """
-    Return all node's descendants of a certain kind
-    """
-
-    if verbose:
-        log.debug(f'find: walked node {pp(node)}')
-
-    if node.kind == kind:
-        yield node
-    # Recurse for children of this node
-    for child in node.get_children():
-        yield from find(child, kind)
-
 def main():
     log.setLevel(logging.INFO)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('segment_file')
-    parser.add_argument('original_file')
-    parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs. Should be used in tandem with "-l DEBUG"')
-    parser.add_argument('-a', '--array', action='append', default=[], help='Assign length expressions for array variables. Length expressions are in the format "array:length", where array is the name of the array and length is a C expression to be evaluated at runtime, typically a number or variable reference')
-    parser.add_argument('-t', '--target', help='Target function in the segment')
-    parser.add_argument('-c', '--clang-args', help='Arguments to clang (e.g. -I..., -W...)', default='')
-    args = parser.parse_args()
+    args = parse_args()
 
     if args.log_level:
         log.setLevel(args.log_level)
@@ -78,43 +37,50 @@ def main():
         verbose = True
         log.debug(f'verbose logging enabled')
 
-    index = clang.cindex.Index.create()
-    seg_tu = index.parse(seg_c, args=clang_args)
-    seg_cur = seg_tu.cursor
+    seg_cur = parse(seg_c, clang_args)
     seg_target = select_target(seg_cur, target_name=args.target)
     parms = list(seg_target.get_arguments())
 
     log.debug(f'target: {pp(seg_target)}')
     
-    orig_tu = index.parse(orig_c)
-    orig_cur = orig_tu.cursor
-    orig_funcdecls = list(find(orig_cur, CursorKind.FUNCTION_DECL))
-    orig_target = next(filter(lambda f: is_the_same(f, seg_target), orig_funcdecls))
-    orig_target_def = orig_target.get_definition()
-    first_stmt = next(filter(lambda c: c.kind.is_statement(), orig_target_def.get_children()))
-    first_stmt_file, first_stmt_line = loc(first_stmt, link=False)
-    with open(first_stmt_file, 'r') as f:
+    orig_cur = parse(orig_c)
+    orig_funcdecls = find(orig_cur, CursorKind.FUNCTION_DECL)
+    orig_target = next(f.get_definition() for f in orig_funcdecls if is_the_same(f, seg_target))
+    orig_body = find(orig_target, lambda c: c.kind.is_statement())
+    first_stmt = next(iter(orig_body))
+    first_stmt_file, first_stmt_line = first_stmt.location.file.name, first_stmt.location.line
+
+    diff = gen_patch(first_stmt_file, first_stmt_line, parms, args.array)
+    print(''.join(diff))
+
+def gen_patch(file, line, parms, array_expressions):
+    with open(file, 'r') as f:
         fromlines = f.readlines()
 
-    arrays = dict(a.split(':') for a in args.array)
+    arrays = dict(a.split(':') for a in array_expressions)
     log.debug(f'{len(parms)} parameters')
     printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
-    tolines = fromlines[:first_stmt_line] + printfs + fromlines[first_stmt_line:]
+    tolines = fromlines[:line] + printfs + fromlines[line:]
 
-    patchfile = first_stmt_file
-    for fi, fp in enumerate(first_stmt_file.split('/'), start=1):
-        for sp in seg_c.split('/'):
-            if fp == sp:
-                patchfile = '/'.join(first_stmt_file.split('/')[fi:])
-                log.debug(f'patching {patchfile}')
+    return difflib.unified_diff(fromlines, tolines, fromfile=file, tofile=file)
 
-    diff = difflib.unified_diff(fromlines, tolines, fromfile=patchfile, tofile=patchfile)
-    print(''.join(diff))
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('segment_file')
+    parser.add_argument('original_file')
+    parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs. Should be used in tandem with "-l DEBUG"')
+    parser.add_argument('-a', '--array', action='append', default=[], help='Assign length expressions for array variables. Length expressions are in the format "array:length", where array is the name of the array and length is a C expression to be evaluated at runtime, typically a number or variable reference')
+    parser.add_argument('-t', '--target', help='Target function in the segment')
+    parser.add_argument('-c', '--clang-args', help='Arguments to clang (e.g. -I..., -W...)', default='')
+    args = parser.parse_args()
+    return args
 
 def is_the_same(orig_cursor, seg_cursor):
     """
     Compare a cursor from the original and the segment to see if they refer to the same function in the project
     """
+
     return seg_cursor.spelling == f'helium_{orig_cursor.spelling}'
 
 def select_target(cur, target_name=None):
