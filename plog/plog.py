@@ -1,17 +1,10 @@
 from nodeutils import find, parse, pp
 from clang.cindex import CursorKind, TypeKind
 
+from mylog import log
 import logging
-import sys
 import difflib
 import argparse
-
-log = logging.getLogger()
-stdout_handler = logging.StreamHandler(sys.stdout)
-verbose_fmt = logging.Formatter('%(levelname)s - %(message)s')
-stdout_handler.setFormatter(verbose_fmt)
-log.addHandler(stdout_handler)
-log.setLevel(logging.DEBUG)
 
 verbose = False
 
