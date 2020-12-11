@@ -14,7 +14,7 @@ import logging
 import re
 
 from mylog import log
-from nodeutils import find, pp
+from nodeutils import find, parse, pp
 
 from dataclasses import dataclass
 from typing import Any
@@ -25,7 +25,7 @@ class LocalVariable:
     name: Any = None
     children: Any = 0
 
-def local_vars(type, varname):
+def locals_for_param(type, varname):
     """
     Yields input variables for type t's fields, down to primitives
     """
@@ -35,14 +35,14 @@ def local_vars(type, varname):
         children = list(td.get_children())
         # TODO: Test for missing struct declaration
         for fd in children:
-            yield from local_vars(fd.type, fd.displayname)
+            yield from locals_for_param(fd.type, fd.displayname)
         yield LocalVariable(type, varname, len(children))
     elif type.kind == TypeKind.POINTER:
         if type.spelling == 'char *':
             yield LocalVariable(type, varname, 0)
         else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
-            yield from local_vars(type.get_pointee(), f'{varname}_v')
+            yield from locals_for_param(type.get_pointee(), f'{varname}_v')
             yield LocalVariable(type, varname, 1)
     elif type.kind == TypeKind.INT:
         yield LocalVariable(type, varname)
@@ -53,7 +53,7 @@ def local_vars(type, varname):
     else:
         raise Exception('local variables unhandled kind', type.kind)
 
-def initializers(vars):
+def initializers_for_locals(vars):
     """
     Yields C statements to declare and read values for input vars.
     """
@@ -137,42 +137,6 @@ int main() {{
 // END test harness
 '''
 
-def generate_harness(infile, func_name, clang_flags):
-    """
-    Generate and return a test harness, a chunk of C code that defines a main method
-    to initialize input variables and call the target function
-    """
-    log.info(f'{clang_flags=}')
-
-    index = clang.cindex.Index.create()
-    tu = index.parse(infile, args=clang_flags)
-    log.info(f'translation unit: {tu.spelling}')
-    
-    cur = tu.cursor
-
-    funcdecls = find(cur, CursorKind.FUNCTION_DECL)
-    if func_name:
-        target = next((n for n in funcdecls if n.spelling == func_name), None)
-        if target is None:
-            raise Exception(f'no function named {func_name}')
-    else:
-        target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name == infile else -1)
-    log.info(f'target function: {pp(target)}')
-
-    inits = []
-    parmesan = list(find(target, CursorKind.PARM_DECL))
-    log.info(f'target function has {len(parmesan)} parameters')
-    for i, parm in enumerate(parmesan):
-        locals = list(local_vars(parm.type, parm.displayname))
-        this_boy_inits = list(initializers(locals))
-        inits += this_boy_inits
-        log.info(f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
-        for l in locals:
-            log.debug(f'local variable {l}')
-
-    param_names = (p.displayname for p in parmesan)
-    return codegen(target.spelling, param_names, inits)
-
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('input_file', help="Path to the input file")
@@ -189,15 +153,34 @@ def get_args():
 
 def main():
     args = get_args()
-    outfile = args.output[0] if args.output else None
     if args.logs:
         log.setLevel(logging.INFO)
     elif args.verbose:
         log.setLevel(logging.DEBUG)
-    else:
-        log.setLevel(logging.ERROR)
 
     func_name = args.func_name[0] if args.func_name else None
+    clang_flags = get_clang_flags(args)
+
+    try:
+        infile = args.input_file
+        log.info(f'{clang_flags=}')
+
+        cur = parse(infile, args=clang_flags)
+
+        target = select_target(func_name, cur)
+
+        parmesan = list(find(target, CursorKind.PARM_DECL))
+        log.info(f'target function has {len(parmesan)} parameters')
+        inits = get_initializers(parmesan)
+
+        param_names = (p.displayname for p in parmesan)
+        test_harness = codegen(target.spelling, param_names, inits)
+        output(args, test_harness)
+    except:
+        log.exception(f'error generating test harness from {args.input_file}')
+        exit(1)
+
+def get_clang_flags(args):
     clang_flags = args.clang_flags[0].split() if args.clang_flags else []
     makefile = args.makefile[0] if args.makefile else None
     if makefile:
@@ -205,12 +188,38 @@ def main():
             for line in f.readlines():
                 if m := re.search(r'CFLAGS:=(.*)', line):
                     clang_flags += m.group(1).split()
-    test_harness = ""
-    try:
-        test_harness =  generate_harness(args.input_file, func_name, clang_flags)
-    except:
-        log.exception(f'error generating test harness from {args.input_file}')
-        exit(1)
+    return clang_flags
+
+def get_initializers(parameters):
+    """
+    Get initializer statements for the given parameters
+    """
+    initializers = []
+    for i, parm in enumerate(parameters):
+        locals = list(locals_for_param(parm.type, parm.displayname))
+        this_boy_inits = list(initializers_for_locals(locals))
+        initializers += this_boy_inits
+        log.info(f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
+        for l in locals:
+            log.debug(f'local variable {l}')
+    return initializers
+
+def select_target(func_name, cur):
+    """
+    Select target function with the given name from cur
+    """
+    funcdecls = find(cur, CursorKind.FUNCTION_DECL)
+    if func_name:
+        target = next((n for n in funcdecls if n.spelling == func_name), None)
+        if target is None:
+            raise Exception(f'no function named {func_name}')
+    else:
+        target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name.endswith('.c') else -1)
+    log.info(f'target function: {pp(target)}')
+    return target
+
+def output(args, test_harness):
+    outfile = args.output[0] if args.output else None
 
     with open(args.input_file, 'r') as f:
         input_text = f.read()
@@ -236,7 +245,6 @@ def main():
         log.info('generated test harness:')
         if args.format:
             if shutil.which('clang-format'):
-
                 tmp_filename = '/tmp/parse.py.fmt.c'
                 with open(tmp_filename, 'w') as f:
                     f.write(raw_text)
@@ -244,7 +252,6 @@ def main():
                 with open(tmp_filename, 'r') as f:
                     formatted_text = f.read()
                 os.remove(tmp_filename)
-
                 print(formatted_text)
             else:
                 log.info('requested format but clang-format not found')
