@@ -52,10 +52,10 @@ class GlobalIndex:
     _instance = None
 
     @classmethod
-    def get():
-        if GlobalIndex._instance is None:
-            GlobalIndex._instance = GlobalIndex()
-        return GlobalIndex._instance
+    def get(cls):
+        if cls._instance is None:
+            cls._instance = GlobalIndex()
+        return cls._instance.index
 
 
 def parse(filepath, args=[]):
