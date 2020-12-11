@@ -58,10 +58,10 @@ class GlobalIndex:
         return GlobalIndex._instance
 
 
-def parse(filepath):
+def parse(filepath, args=[]):
     """
     Parse filepath and return a cursor to the translation unit
     """
     index = GlobalIndex.get()
-    translation_unit = index.parse(filepath)
+    translation_unit = index.parse(filepath, args=args)
     return translation_unit.cursor
