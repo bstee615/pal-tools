@@ -2,5 +2,9 @@
 data
 *.out
 __pycache__
+<<<<<<< HEAD
 *_harness.c
 *.patch
+=======
+*_harness.c
+>>>>>>> harn/master
