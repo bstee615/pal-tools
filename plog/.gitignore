@@ -1,0 +1,8 @@
+.vscode
+data
+*.out
+__pycache__
+*_harness.c
+*.patch
+orig
+seg
