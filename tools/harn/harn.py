@@ -11,37 +11,14 @@ import shutil
 import subprocess
 import os
 import logging
-import sys
 import re
 
-log = logging.getLogger()
-stdout_handler = logging.StreamHandler(sys.stdout)
-verbose_fmt = logging.Formatter('%(levelname)s - %(message)s')
-stdout_handler.setFormatter(verbose_fmt)
-log.addHandler(stdout_handler)
-log.setLevel(logging.DEBUG)
-
-def pp(node):
-    """
-    Return str of node for pretty print
-    """
-    return f'{node.displayname} ({node.kind}) [{node.location}]'
-
-def find(node, kind):
-    """
-    Return all node's descendants of a certain kind
-    """
-
-    log.debug(f'find: walked node {pp(node)}')
-
-    if node.kind == kind:
-        yield node
-    # Recurse for children of this node
-    for child in node.get_children():
-        yield from find(child, kind)
+from mylog import log
+from nodeutils import find, pp
 
 from dataclasses import dataclass
 from typing import Any
+
 @dataclass
 class LocalVariable:
     type: Any = None
@@ -214,11 +191,11 @@ def main():
     args = get_args()
     outfile = args.output[0] if args.output else None
     if args.logs:
-        stdout_handler.setLevel(logging.INFO)
+        log.setLevel(logging.INFO)
     elif args.verbose:
-        stdout_handler.setLevel(logging.DEBUG)
+        log.setLevel(logging.DEBUG)
     else:
-        stdout_handler.setLevel(logging.ERROR)
+        log.setLevel(logging.ERROR)
 
     func_name = args.func_name[0] if args.func_name else None
     clang_flags = args.clang_flags[0].split() if args.clang_flags else []
