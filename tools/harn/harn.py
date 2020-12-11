@@ -3,7 +3,6 @@
 """ Find all usages of some type
 """
 
-import clang.cindex
 from clang.cindex import CursorKind, TypeKind
 
 import argparse
@@ -19,11 +18,13 @@ from nodeutils import find, parse, pp
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass
 class LocalVariable:
     type: Any = None
     name: Any = None
     children: Any = 0
+
 
 def locals_for_param(type, varname):
     """
@@ -53,14 +54,15 @@ def locals_for_param(type, varname):
     else:
         raise Exception('local variables unhandled kind', type.kind)
 
+
 def initializers_for_locals(vars):
     """
     Yields C statements to declare and read values for input vars.
     """
-    
+
     def declare(v):
         return f'{v.type.spelling} {v.name};'
-        
+
     def throwaway_getline(var_name, fmt):
         """
         Declare a string and string length variable, call getline, assign result then free the buffer
@@ -80,7 +82,8 @@ free({str_name});
     def read_and_assign(i, v):
         vars_so_far = vars[:i]
         if v.type.kind == TypeKind.ELABORATED:
-            assignments = '\n'.join(f'{v.name}.{c.name} = {c.name};' for c in reversed(vars_so_far[-v.children:]))
+            assignments = '\n'.join(
+                f'{v.name}.{c.name} = {c.name};' for c in reversed(vars_so_far[-v.children:]))
             return f'''// BEGIN assign fields of {v.name}
 {assignments}
 // END assign fields of {v.name}'''
@@ -108,8 +111,13 @@ free({str_name});
     for i, v in enumerate(vars):
         yield (declare(v), read_and_assign(i, v), cleanup(v))
 
-def codegen(fn_name, param_names, inits):
-    decls, defs, cleanups = ('\n'.join(filter(lambda x: x, l)) for l in zip(*inits))
+
+def codegen(fn_name, param_names, initializers):
+    """
+    Generate code for parameter names and initializers
+    """
+    decls, defs, cleanups = ('\n'.join(filter(lambda x: x, l))
+                             for l in zip(*initializers))
 
     return f'''
 // BEGIN test harness
@@ -137,58 +145,6 @@ int main() {{
 // END test harness
 '''
 
-def get_args():
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input_file', help="Path to the input file")
-    parser.add_argument('-o', '--output', help='Path to the output file', type=str, nargs=1)
-    parser.add_argument('-c', '--clang_flags', help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
-    parser.add_argument('-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
-    
-    parser.add_argument('-f', '--format', help='Format the output file with clang-format', action="store_true")
-    parser.add_argument('-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
-    parser.add_argument('-l', '--logs', help='Print informational logs to stdout', action="store_true")
-    parser.add_argument('-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
-
-    return parser.parse_args()
-
-def main():
-    args = get_args()
-    if args.logs:
-        log.setLevel(logging.INFO)
-    elif args.verbose:
-        log.setLevel(logging.DEBUG)
-
-    func_name = args.func_name[0] if args.func_name else None
-    clang_flags = get_clang_flags(args)
-
-    try:
-        infile = args.input_file
-        log.info(f'{clang_flags=}')
-
-        cur = parse(infile, args=clang_flags)
-
-        target = select_target(func_name, cur)
-
-        parmesan = list(find(target, CursorKind.PARM_DECL))
-        log.info(f'target function has {len(parmesan)} parameters')
-        inits = get_initializers(parmesan)
-
-        param_names = (p.displayname for p in parmesan)
-        test_harness = codegen(target.spelling, param_names, inits)
-        output(args, test_harness)
-    except:
-        log.exception(f'error generating test harness from {args.input_file}')
-        exit(1)
-
-def get_clang_flags(args):
-    clang_flags = args.clang_flags[0].split() if args.clang_flags else []
-    makefile = args.makefile[0] if args.makefile else None
-    if makefile:
-        with open(makefile, 'r') as f:
-            for line in f.readlines():
-                if m := re.search(r'CFLAGS:=(.*)', line):
-                    clang_flags += m.group(1).split()
-    return clang_flags
 
 def get_initializers(parameters):
     """
@@ -199,10 +155,12 @@ def get_initializers(parameters):
         locals = list(locals_for_param(parm.type, parm.displayname))
         this_boy_inits = list(initializers_for_locals(locals))
         initializers += this_boy_inits
-        log.info(f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
+        log.info(
+            f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
         for l in locals:
             log.debug(f'local variable {l}')
     return initializers
+
 
 def select_target(func_name, cur):
     """
@@ -214,11 +172,30 @@ def select_target(func_name, cur):
         if target is None:
             raise Exception(f'no function named {func_name}')
     else:
-        target = max(funcdecls, key=lambda n: n.location.line if n.spelling != 'main' and n.location.file.name.endswith('.c') else -1)
+        target = max(funcdecls, key=lambda n: n.location.line if n.spelling !=
+                     'main' and n.location.file.name.endswith('.c') else -1)
     log.info(f'target function: {pp(target)}')
     return target
 
+
+def get_clang_flags(args):
+    """
+    Aggregate clang flags from args and Makefile if specified
+    """
+    clang_flags = args.clang_flags[0].split() if args.clang_flags else []
+    makefile = args.makefile[0] if args.makefile else None
+    if makefile:
+        with open(makefile, 'r') as f:
+            for line in f.readlines():
+                if m := re.search(r'CFLAGS:=(.*)', line):
+                    clang_flags += m.group(1).split()
+    return clang_flags
+
+
 def output(args, test_harness):
+    """
+    Output test_harness to file or stdout, depending on args
+    """
     outfile = args.output[0] if args.output else None
 
     with open(args.input_file, 'r') as f:
@@ -257,6 +234,59 @@ def output(args, test_harness):
                 log.info('requested format but clang-format not found')
         else:
             print(raw_text)
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('input_file', help="Path to the input file")
+    parser.add_argument(
+        '-o', '--output', help='Path to the output file', type=str, nargs=1)
+    parser.add_argument('-c', '--clang_flags',
+                        help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
+    parser.add_argument(
+        '-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
+
+    parser.add_argument(
+        '-f', '--format', help='Format the output file with clang-format', action="store_true")
+    parser.add_argument(
+        '-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
+    parser.add_argument(
+        '-l', '--logs', help='Print informational logs to stdout', action="store_true")
+    parser.add_argument(
+        '-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
+
+    return parser.parse_args()
+
+
+def main():
+    args = get_args()
+    if args.logs:
+        log.setLevel(logging.INFO)
+    elif args.verbose:
+        log.setLevel(logging.DEBUG)
+
+    func_name = args.func_name[0] if args.func_name else None
+    clang_flags = get_clang_flags(args)
+
+    try:
+        infile = args.input_file
+        log.info(f'{clang_flags=}')
+
+        cur = parse(infile, args=clang_flags)
+
+        target = select_target(func_name, cur)
+
+        parmesan = list(find(target, CursorKind.PARM_DECL))
+        log.info(f'target function has {len(parmesan)} parameters')
+        inits = get_initializers(parmesan)
+
+        param_names = (p.displayname for p in parmesan)
+        test_harness = codegen(target.spelling, param_names, inits)
+        output(args, test_harness)
+    except:
+        log.exception(f'error generating test harness from {args.input_file}')
+        exit(1)
+
 
 if __name__ == "__main__":
     main()
