@@ -4,5 +4,3 @@ data
 __pycache__
 *_harness.c
 *.patch
-orig
-seg
