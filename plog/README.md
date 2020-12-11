@@ -1,4 +1,4 @@
-# mirror.py
+# plog.py
 
 Capture fault signature input from program input.
 The original program's failure inducing input is provided as a program input.
