@@ -2,6 +2,7 @@
 Utilities for nodes (cursors) in the Clang AST
 """
 
+from clang.cindex import CursorKind
 from mylog import log
 import clang
 
@@ -16,7 +17,7 @@ def pp(node):
         return f'{node.spelling} ({node.kind})'
 
 
-def find(node, kind, verbose=False):
+def find(node, selector, verbose=False):
     """
     Return all node's descendants of a certain kind
     """
@@ -24,11 +25,20 @@ def find(node, kind, verbose=False):
     if verbose:
         log.debug(f'find: walked node {pp(node)}')
 
-    if node.kind == kind:
-        yield node
+    found = []
+
+    if isinstance(selector, CursorKind):
+        if node.kind == selector:
+            found.append(node)
+    elif callable(selector):
+        if selector(node):
+            found.append(node)
+
     # Recurse for children of this node
     for child in node.get_children():
-        yield from find(child, kind)
+        found += find(child, selector, verbose)
+
+    return found
 
 
 class GlobalIndex:
