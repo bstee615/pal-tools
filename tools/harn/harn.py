@@ -22,6 +22,8 @@ def stmts_for_param(type, varname, declare=True):
     Yields input variables for type t's fields, down to primitives
     """
 
+    type = type.get_canonical()
+
     decls = []
     inits = []
     shift_argv = 'shift_argi()'
