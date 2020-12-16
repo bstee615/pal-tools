@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import shutil
+import difflib
 
 '''
 Parse Xueyuan's human readable assertions
@@ -36,15 +37,27 @@ def parse(dirname, assertion):
     m = re.match(r'([^,]+),\s*(before|after)\s*line\s*([0-9]+).*(assert\(.*\);)', assertion)
     file_path = os.path.join(dirname, m.group(1))
     before_after = m.group(2)
-    line_no = m.group(3)
+    line_no = int(m.group(3))
     assert_stmt = m.group(4)
     assert_args = re.match(r'assert\((.*)\);', assert_stmt).group(1)
     my_assert_stmt = f'if (!{assert_args}) {{*((int*)0) = 0;}} // my_assert'
+    my_assert_stmt += '\n'
 
-    print(before_after, f'{file_path}:{line_no}')
-    print()
-    print(my_assert_stmt)
-    print()
+    log.debug(f'{file_path}:{line_no} {my_assert_stmt}')
+
+    fromlines = open(file_path, 'r').readlines()
+    if before_after == 'before':
+        tolines = fromlines[:line_no-1] + [my_assert_stmt] + fromlines[line_no-1:]
+    elif before_after == 'after':
+        tolines = fromlines[:line_no] + [my_assert_stmt] + fromlines[line_no:]
+    else:
+        log.critical(f'before_after is not valid: {before_after}')
+        return
+
+    unidiff = difflib.unified_diff(fromlines, tolines, fromfile=file_path, tofile=file_path)
+    patch = ''.join(unidiff)
+    # log.debug(patch)
+    return patch
 
 def main():
     df = pandas.read_csv('notes.tsv', sep='\t')
@@ -68,7 +81,10 @@ def main():
                 print('error, trying cp -r')
                 subprocess.check_call(args=['cp', '-r', src_dirname, buggy_dirname])
 
-        parse(buggy_dirname, assertion)
+        patch = parse(buggy_dirname, assertion)
+        assert_file = os.path.join(buggy_dirname, 'my_assert.patch')
+        log.debug(f'writing patch to {assert_file}')
+        open(assert_file, 'w').write(patch)
 
 if __name__ == '__main__':
     main()
