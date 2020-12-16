@@ -1,0 +1,4 @@
+#!/bin/python3
+
+from tools.pass.pass import main
+main()
