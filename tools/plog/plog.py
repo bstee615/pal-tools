@@ -102,11 +102,11 @@ def select_target(cur, target_name=None):
         eligible = filter(lambda f: '.c' in f.location.file.name and f.spelling != 'main', func_decls)
         return max(eligible, key=lambda f: f.location.line)
 
-def gen_printfs(parms, arrays={}):
+def gen_printfs(parms):
     """
     Generate printf statements for a set of function parmameters, otherwise leave a to do comment
     """
-    def genny(name, t, stack=[]):
+    def genny(name, t):
         if t.kind == TypeKind.TYPEDEF:
             t = t.get_canonical()
 
