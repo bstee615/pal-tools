@@ -1,0 +1,50 @@
+#!/bin/python3
+from pathlib import Path
+import os
+import stat
+
+def exe_template(name):
+    return f'''#!/bin/python3
+
+from tools.{name}.{name} import main
+main()
+'''
+
+def tool_template(name):
+    return f'''#!/bin/python3
+
+def main():
+    print(\'TODO {name}ify the things\')
+'''
+
+def make_exe(file):
+    st = os.stat(file)
+    os.chmod(file, st.st_mode | stat.S_IEXEC)
+
+def main():
+    root = Path(__file__).parent.absolute()
+    name = input('name: ').strip()
+    while not name or len(name.split()) > 1 or any(not c.isalnum() for c in name):
+        print('tool name must be one word and a valid name for a command.')
+        name = input('name (Ctrl+C): ').strip()
+
+    exe = root/name
+    toolroot = root/'tools'/name
+    toolmain = toolroot/f'{name}.py'
+
+    if exe.is_file() or toolroot.is_dir():
+        print('a tool with the same name already exists')
+        return
+    
+    print(f'creating new tool named {name}')
+
+    exe.open('w').write(exe_template(name))
+    make_exe(exe)
+    toolroot.mkdir()
+    toolmain.open('w').write(tool_template(name))
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
