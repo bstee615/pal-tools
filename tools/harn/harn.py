@@ -195,7 +195,6 @@ def get_clang_flags(args):
     """
     clang_flags = args.clang_flags[0].split() if args.clang_flags else []
     if args.directory:
-        args.directory = Path(args.directory)
         makefile = args.directory/'Makefile'
         log.debug(f'path to Makefile: {makefile}')
         assert(makefile.is_file())
@@ -257,9 +256,9 @@ def read_input_file(translation_unit):
 
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input_file', help="Path to the input file. Can be a full filepath or, if -d is specified a path relative to the project directory.")
+    parser.add_argument('input_file', nargs='?', help="Path to the input file. Can be a full filepath or, if -d is specified a path relative to the project directory. Omitting causes harn to search automatically for an input file named something close to main.c")
     parser.add_argument(
-        '-d', '--directory', help='Directory of input project', type=str)
+        '-d', '--directory', help='Directory of input project', type=str, default=Path.cwd())
     parser.add_argument(
         '-o', '--output', help='Path to the output file', type=str, nargs=1)
     parser.add_argument('-c', '--clang_flags',
@@ -270,7 +269,10 @@ def get_args():
         '-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (ex. DEBUG, INFO, ERROR)', type=str)
 
-    return parser.parse_args()
+    arguments = parser.parse_args()
+    if isinstance(arguments.directory, str):
+        arguments.directory = Path(arguments.directory)
+    return arguments
 
 
 def main():
@@ -285,9 +287,12 @@ def main():
     log.info(f'clang_flags={clang_flags}')
 
     try:
-        infile = Path(args.input_file)
-        if not infile.is_file():
-            infile = Path(args.directory) / args.input_file
+        if args.input_file:
+            infile = Path(args.input_file)
+            if not infile.is_file():
+                infile = args.directory / args.input_file
+        else:
+            infile = next(args.directory.glob('**/*main*.c'))
         assert(infile.is_file())
         log.info(f'infile={infile}')
         cur = parse(infile, args=clang_flags)
