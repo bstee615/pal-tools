@@ -17,7 +17,7 @@ from mylog import log
 from nodeutils import find, parse, pp
 
 
-def stmts_for_param(type, varname, declare=True, stack=[]):
+def stmts_for_param(type, varname, declare=True):
     """
     Yields input variables for type t's fields, down to primitives
     """
@@ -36,23 +36,25 @@ def stmts_for_param(type, varname, declare=True, stack=[]):
     if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
+        inits.append(f'// TODO assign fields for {varname}')
         if any(children):
-            for fd in children:
-                childname = f'{varname}.{fd.displayname}'
-                if type in stack:
-                    inits.append(f'// TODO recursive type {varname}:{type.spelling}')
+            for child in children:
+                if child.kind == CursorKind.UNION_DECL:
+                    if child.is_anonymous():
+                        inits.append(f'// {varname}.<anonymous>')
+                    else:
+                        inits.append(f'// {varname}.{child.spelling}')
                 else:
-                    yield from stmts_for_param(fd.type, childname, declare=False, stack=stack+[type])
+                    inits.append(f'// {varname}.{child.spelling} = {child.spelling};')
         else:
             log.warning(f'no fields found for type {type.spelling} (kind {type.kind})')
-            inits.append(f'// TODO assign fields to {varname}')
     elif type.kind == TypeKind.POINTER:
         if type.get_pointee().kind == TypeKind.CHAR_S:
             inits.append(f'{varname} = {shift_argv};')
         else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
             valname = f'{varname}_v'
-            yield from stmts_for_param(type.get_pointee(), valname, stack=stack+[type])
+            yield from stmts_for_param(type.get_pointee(), valname)
             inits.append(f'{varname} = &{valname};')
     elif type.kind == TypeKind.INT or \
         type.kind == TypeKind.SHORT or \
@@ -82,8 +84,7 @@ def stmtgen(parameters):
     inits = []
 
     for i, parm in enumerate(parameters):
-        decls_and_inits = list(stmts_for_param(parm.type, parm.displayname))
-        parm_decls, parm_inits = zip(*decls_and_inits)
+        parm_decls, parm_inits = zip(*stmts_for_param(parm.type, parm.displayname))
         log.info(
             f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
         for i in parm_decls:
