@@ -16,6 +16,7 @@ Parse Xueyuan's human readable assertions
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('filter', nargs='?', help='Filter bugs to a certain filter')
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     arguments = parser.parse_args()
@@ -61,6 +62,12 @@ def parse(dirname, assertion):
 
 def main():
     df = pandas.read_csv('notes.tsv', sep='\t')
+    filtered = []
+    if args.filter:
+        for name_regex in args.filter.split(','):
+            name_regex = f'^{name_regex}'
+            filtered.append(df.loc[df['Name'].str.contains(name_regex), :])
+        df = pandas.concat(filtered)
 
     for i, row in df.iterrows():
         name = row['Name']
