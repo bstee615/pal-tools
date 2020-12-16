@@ -35,19 +35,31 @@ verbose=False
 
 def parse(dirname, buggy_dirname, assertion):
     dirname = os.path.abspath(dirname)
-    m = re.match(r'([^,]+),\s*(before|after)\s*line\s*([0-9]+).*(assert\(.*\);)', assertion)
+    m = re.match(r'([^,]+),\s*(before|after)\s*line\s*([0-9]+)\s*\((.*)\),\s*(assert\(.*\);)', assertion)
     file_path = os.path.join(dirname, m.group(1))
     buggy_file_path = os.path.join(dirname, m.group(1))
     before_after = m.group(2)
     line_no = int(m.group(3))
-    assert_stmt = m.group(4)
+    expr = m.group(4).strip()
+    assert_stmt = m.group(5)
     assert_args = re.match(r'assert\((.*)\);', assert_stmt).group(1)
     my_assert_stmt = f'if (!{assert_args}) {{*((int*)0) = 0;}} // my_assert'
     my_assert_stmt += '\n'
-
-    log.debug(f'{before_after} {file_path}:{line_no} {my_assert_stmt}')
+    
+    log.info(f'{before_after} {file_path}:{line_no} "{my_assert_stmt}"')
 
     fromlines = open(file_path, 'r').readlines()
+    
+    matchto = [l.strip() for l in fromlines[line_no-2:line_no+2]]
+    matches = difflib.get_close_matches(expr, matchto)
+    log.debug(f'close matching "{expr}"')
+    assert(len(matches) > 0)
+    new_line_no = line_no-2 + matchto.index(matches[0])+1
+    if new_line_no != line_no:
+        log.warn(f'switched line number to {new_line_no}')
+        line_no = new_line_no
+    log.debug(f'close matched {file_path}:{line_no} "{fromlines[line_no-1]}"')
+
     if before_after == 'before':
         tolines = fromlines[:line_no-1] + [my_assert_stmt] + fromlines[line_no-1:]
     elif before_after == 'after':
@@ -66,7 +78,7 @@ def main():
     if args.filter:
         for name_regex in args.filter.split(','):
             name_regex = f'^{name_regex}'
-            filtered.append(df.loc[df['Name'].str.contains(name_regex), :])
+            filtered.append(df.loc[df['Bug'].str.contains(name_regex), :])
         df = pandas.concat(filtered)
 
     for i, row in df.iterrows():
