@@ -25,7 +25,7 @@ def locals_for_param(type, varname):
     Yields input variables for type t's fields, down to primitives
     """
 
-    if type.kind == TypeKind.ELABORATED:
+    if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
         # TODO: Test for missing struct declaration
@@ -33,20 +33,28 @@ def locals_for_param(type, varname):
             yield from locals_for_param(fd.type, fd.displayname)
         yield LocalVariable(type, varname, len(children))
     elif type.kind == TypeKind.POINTER:
-        if type.spelling == 'char *':
+        if type.get_pointee().kind == TypeKind.CHAR_S:
             yield LocalVariable(type, varname, 0)
         else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
             yield from locals_for_param(type.get_pointee(), f'{varname}_v')
             yield LocalVariable(type, varname, 1)
-    elif type.kind == TypeKind.INT:
+    elif type.kind == TypeKind.INT or \
+        type.kind == TypeKind.SHORT or \
+        type.kind == TypeKind.LONG or \
+        type.kind == TypeKind.LONGLONG or \
+        type.kind == TypeKind.INT128 or \
+        type.kind == TypeKind.ENUM:
         yield LocalVariable(type, varname)
-    elif type.kind == TypeKind.UINT:
+    elif type.kind == TypeKind.UINT or \
+        type.kind == TypeKind.ULONG or \
+        type.kind == TypeKind.ULONGLONG or \
+        type.kind == TypeKind.UINT128:
         yield LocalVariable(type, varname)
     elif type.kind == TypeKind.CHAR_S:
         yield LocalVariable(type, varname)
     else:
-        raise Exception('local variables unhandled kind', type.kind)
+        yield f'// TODO benjis: print {varname}'
 
 
 def initializers_for_locals(vars):
@@ -271,7 +279,7 @@ def main():
 
         target = select_target(func_name, cur)
 
-        parmesan = list(find(target, CursorKind.PARM_DECL))
+        parmesan = find(target, CursorKind.PARM_DECL)
         log.info(f'target function has {len(parmesan)} parameters')
         inits = get_initializers(parmesan)
 
