@@ -17,7 +17,7 @@ from mylog import log
 from nodeutils import find, parse, pp
 
 
-def stmts_for_param(type, varname, declare=True, stack=[]):
+def stmts_for_param(type, varname, stack=[]):
     """
     Yields input variables for type t's fields, down to primitives
     """
@@ -30,7 +30,7 @@ def stmts_for_param(type, varname, declare=True, stack=[]):
 
     log.debug(f'variable {varname} type {type.spelling} (kind {type.kind})')
 
-    if declare and not (type.kind == TypeKind.FUNCTIONPROTO or (type.kind == TypeKind.POINTER and type.get_pointee().kind == TypeKind.FUNCTIONPROTO)):
+    if not (type.kind == TypeKind.FUNCTIONPROTO or (type.kind == TypeKind.POINTER and type.get_pointee().kind == TypeKind.FUNCTIONPROTO)):
         decls.append(f'{type.spelling} {varname.replace(".", "_")};')
 
     if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
@@ -57,9 +57,8 @@ def stmts_for_param(type, varname, declare=True, stack=[]):
                             yield from stmts_for_param(child.type.get_pointee(), valname, stack=stack+[child.type])
                             inits.append(f'{child_varname} = &{valname};')
                 else:
-                    child_decls, child_inits = zip(*stmts_for_param(child.type, f'{child_varname}', stack=stack+[child.type]))
-                    # decls += (f'{c}' for l in child_decls for c in l)
-                    inits += (f'{c}' for l in child_inits for c in l)
+                    child_inits = zip(*stmts_for_param(child.type, f'{child_varname}', stack=stack+[child.type]))
+                    yield from (([], c) for l in child_inits for c in l)
         else:
             log.warning(f'no fields found for type {type.spelling} (kind {type.kind})')
     elif type.kind == TypeKind.POINTER:
