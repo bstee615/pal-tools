@@ -34,9 +34,13 @@ def stmts_for_param(type, varname, declare=True):
     if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
+        if any(children):
         for fd in children:
             childname = f'{varname}.{fd.displayname}'
             yield from stmts_for_param(fd.type, childname, declare=False)
+        else:
+            log.warning(f'no fields found for type {type.kind}')
+            inits.append(f'// TODO assign fields to {varname}')
     elif type.kind == TypeKind.POINTER:
         if type.get_pointee().kind == TypeKind.CHAR_S:
             inits.append(f'{varname} = {shift_argv};')
