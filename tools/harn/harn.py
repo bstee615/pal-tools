@@ -120,7 +120,11 @@ char *shift_argi() {{
     int old_argi = argi;
     argi++;
     assert(old_argi < global_argc);
-    return global_argv[old_argi];
+    char *return_value = global_argv[old_argi];
+    if (strcmp(return_value, "NULL") == 0) {{
+        return_value = NULL;
+    }}
+    return return_value;
 }}
 
 int main(int argc, char **argv) {{
