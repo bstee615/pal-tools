@@ -62,24 +62,6 @@ def stmts_for_param(type, varname, declare=True):
     yield decls, inits
 
 
-def codegen(call, stmts):
-    """
-    Generate code for parameter names and code statements
-    """
-
-    body = stmts + call
-
-    return f'''
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-int main() {{
-{body}
-}}
-'''
-
-
 def stmtgen(parameters):
     """
     Get declaration and initializer statements for the given parameters
@@ -91,27 +73,16 @@ def stmtgen(parameters):
         decls_and_inits = list(stmts_for_param(parm.type, parm.displayname))
         log.debug(decls_and_inits)
         parm_decls, parm_inits = zip(*decls_and_inits)
-        decls += parm_decls
-        inits += parm_inits
         log.info(
             f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
         for i in parm_decls:
             log.debug(f'local variable {i}')
         for i in parm_inits:
             log.debug(f'initializer {i}')
+        decls += (i for ilist in parm_decls for i in ilist)
+        inits += (i for ilist in parm_inits for i in ilist)
 
-    decls_code = '\n'.join(i for ilist in decls for i in ilist)
-    inits_code = '\n'.join(i for ilist in inits for i in ilist)
-    return f'''
-// argi is used for iterating through the input arguments
-int argi = 1;
-
-// declarations
-{decls_code}
-
-// initializers
-{inits_code}
-'''
+    return decls, inits
 
 
 def callgen(fn, parameters):
@@ -119,10 +90,41 @@ def callgen(fn, parameters):
     Generate a call to the function, with the given parameters
     """
     parameters_text = ', '.join(p.spelling for p in parameters)
-    return f'''
+    return f'{fn.spelling}({parameters_text});'
+
+
+def codegen(target):
+    """
+    Generate code for parameter names and code statements
+    """
+    
+    parameters = find(target, CursorKind.PARM_DECL)
+    log.info(f'target function has {len(parameters)} parameters')
+
+    decls, inits = stmtgen(parameters)
+    call = callgen(target, parameters)
+
+    template = '''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(int argc, char **argv) {{
+// argi is used for iterating through the input arguments
+int argi = 1;
+
+// declarations
+{declarations}
+
+// initializers
+{initializers}
+
 // call into segment
-{fn.spelling}({parameters_text});
+{call}
+}}
 '''
+    sub = template.format(declarations='\n'.join(decls), initializers='\n'.join(inits), call=call)
+    return sub
 
 
 def select_target(func_name, cur):
@@ -235,11 +237,7 @@ def main():
 
         target = select_target(func_name, cur)
 
-        parmesan = find(target, CursorKind.PARM_DECL)
-        log.info(f'target function has {len(parmesan)} parameters')
-        stmts = stmtgen(parmesan)
-        call = callgen(target, parmesan)
-        test_harness = codegen(call, stmts)
+        test_harness = codegen(target)
         output(args, test_harness)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
