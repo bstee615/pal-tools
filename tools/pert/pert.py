@@ -50,10 +50,14 @@ def parse(dirname, buggy_dirname, assertion):
 
     fromlines = open(file_path, 'r').readlines()
     
-    matchto = [l.strip() for l in [fromlines[line_no-(2 if before_after == 'begin' else 1)]]]
+    matchto = [l.strip() for l in fromlines[line_no-2:line_no+2]]
     matches = difflib.get_close_matches(expr, matchto)
     log.debug(f'close matching "{expr}"')
     assert(len(matches) > 0)
+    new_line_no = line_no-2 + matchto.index(matches[0])+1
+    if new_line_no != line_no:
+        log.warn(f'switched line number to {new_line_no}')
+        line_no = new_line_no
     log.debug(f'close matched {file_path}:{line_no} "{fromlines[line_no-1]}"')
 
     if before_after == 'before':
