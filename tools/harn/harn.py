@@ -84,6 +84,10 @@ def stmts_for_param(type, varname, stack=[]):
         type.kind == TypeKind.ULONGLONG or \
         type.kind == TypeKind.UINT128:
         inits.append(f'{varname} = strtoul({shift_argv}, NULL, 10);')
+    elif type.kind == TypeKind.DOUBLE or type.kind == TypeKind.LONGDOUBLE:
+        inits.append(f'{varname} = strtod({shift_argv}, NULL);')
+    elif type.kind == TypeKind.FLOAT:
+        inits.append(f'{varname} = atof({shift_argv});')
     elif type.kind == TypeKind.CHAR_S:
         inits.append(f'{varname} = {shift_argv}[0];')
     elif type.kind == TypeKind.FUNCTIONPROTO:
