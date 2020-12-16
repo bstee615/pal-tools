@@ -15,15 +15,9 @@ import re
 from mylog import log
 from nodeutils import find, parse, pp
 
-from dataclasses import dataclass
-from typing import Any
+from collections import namedtuple
 
-
-@dataclass
-class LocalVariable:
-    type: Any = None
-    name: Any = None
-    children: Any = 0
+LocalVariable = namedtuple('LocalVariable', ['type', 'name', 'children'])
 
 
 def locals_for_param(type, varname):
@@ -187,7 +181,8 @@ def get_clang_flags(args):
     if makefile:
         with open(makefile, 'r') as f:
             for line in f.readlines():
-                if m := re.search(r'CFLAGS:=(.*)', line):
+                m = re.search(r'CFLAGS:=(.*)', line)
+                if m:
                     clang_flags += m.group(1).split()
     return clang_flags
 
@@ -270,7 +265,7 @@ def main():
 
     try:
         infile = args.input_file
-        log.info(f'{clang_flags=}')
+        log.info(f'clang_flags={clang_flags}')
 
         cur = parse(infile, args=clang_flags)
 
