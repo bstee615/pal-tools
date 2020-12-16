@@ -33,10 +33,11 @@ def parse_args():
 args = parse_args()
 verbose=False
 
-def parse(dirname, assertion):
+def parse(dirname, buggy_dirname, assertion):
     dirname = os.path.abspath(dirname)
     m = re.match(r'([^,]+),\s*(before|after)\s*line\s*([0-9]+).*(assert\(.*\);)', assertion)
     file_path = os.path.join(dirname, m.group(1))
+    buggy_file_path = os.path.join(dirname, m.group(1))
     before_after = m.group(2)
     line_no = int(m.group(3))
     assert_stmt = m.group(4)
@@ -44,7 +45,7 @@ def parse(dirname, assertion):
     my_assert_stmt = f'if (!{assert_args}) {{*((int*)0) = 0;}} // my_assert'
     my_assert_stmt += '\n'
 
-    log.debug(f'{file_path}:{line_no} {my_assert_stmt}')
+    log.debug(f'{before_after} {file_path}:{line_no} {my_assert_stmt}')
 
     fromlines = open(file_path, 'r').readlines()
     if before_after == 'before':
@@ -55,9 +56,8 @@ def parse(dirname, assertion):
         log.critical(f'before_after is not valid: {before_after}')
         return
 
-    unidiff = difflib.unified_diff(fromlines, tolines, fromfile=file_path, tofile=file_path)
+    unidiff = difflib.unified_diff(fromlines, tolines, fromfile=buggy_file_path, tofile=buggy_file_path)
     patch = ''.join(unidiff)
-    # log.debug(patch)
     return patch
 
 def main():
@@ -78,9 +78,9 @@ def main():
         dirname = os.path.join('functional', bug)
 
         # Copy to buggy folder
+        src_dirname = os.path.join(dirname, name)
         buggy_dirname = os.path.join(dirname, f'buggy.{buggy_version}')
         if not os.path.isdir(buggy_dirname):
-            src_dirname = os.path.join(dirname, name)
             try:
                 print('copying', src_dirname, 'to', buggy_dirname)
                 shutil.copytree(src_dirname, buggy_dirname)
@@ -88,7 +88,7 @@ def main():
                 print('error, trying cp -r')
                 subprocess.check_call(args=['cp', '-r', src_dirname, buggy_dirname])
 
-        patch = parse(buggy_dirname, assertion)
+        patch = parse(src_dirname, buggy_dirname, assertion)
         assert_file = os.path.join(buggy_dirname, 'my_assert.patch')
         log.debug(f'writing patch to {assert_file}')
         open(assert_file, 'w').write(patch)
