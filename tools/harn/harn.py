@@ -24,7 +24,7 @@ def stmts_for_param(type, varname, declare=True):
 
     decls = []
     inits = []
-    shift_argv = 'shift_argi()'
+    shift_argv = 'argv[shift_argi()]'
 
     if declare:
         decls.append(f'{type.spelling} {varname};')
@@ -116,9 +116,9 @@ int argi = 1;
 int global_argc;
 
 int shift_argi() {{
+    assert(argi < global_argc);
     int old_argi = argi;
     argi++;
-    assert(argi < global_argc);
     return old_argi;
 }}
 
