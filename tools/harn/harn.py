@@ -170,17 +170,12 @@ def get_clang_flags(args):
     return clang_flags
 
 
-def output(args, test_harness):
+def output(args, input_text, test_harness):
     """
     Output test_harness to file or stdout, depending on args
     """
     outfile = args.output[0] if args.output else None
 
-    with open(args.input_file, 'r') as f:
-        input_text = f.read()
-    if '// BEGIN test harness' in input_text:
-        log.critical('Test harness exists in the input file; please delete it')
-        exit(1)
     raw_text = f'''
 {input_text}
 // test harness
@@ -215,6 +210,17 @@ def output(args, test_harness):
             print(raw_text)
 
 
+def read_input_file(translation_unit):
+    input_lines = open(translation_unit.spelling, 'r').readlines()
+    def is_main_definition(n):
+        return n.kind == CursorKind.FUNCTION_DECL and n.is_definition() and n.spelling == 'main'
+    main_def = next(iter(find(translation_unit, is_main_definition)), None)
+    if main_def:
+        start, end = main_def.extent.start.line, main_def.extent.end.line
+        input_lines = input_lines[:start-1] + input_lines[end:]
+    return ''.join(input_lines)
+
+
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('input_file', help="Path to the input file")
@@ -246,13 +252,12 @@ def main():
     try:
         infile = args.input_file
         log.info(f'clang_flags={clang_flags}')
-
         cur = parse(infile, args=clang_flags)
 
         target = select_target(func_name, cur)
-
         test_harness = codegen(target)
-        output(args, test_harness)
+        input_text = read_input_file(cur)
+        output(args, input_text, test_harness)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
         exit(1)
