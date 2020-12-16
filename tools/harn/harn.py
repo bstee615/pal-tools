@@ -1,6 +1,7 @@
 #!/bin/python3
 
-""" Find all usages of some type
+"""
+Generate a test harness for a fault signature
 """
 
 from clang.cindex import CursorKind, TypeKind
@@ -13,147 +14,167 @@ import logging
 import re
 
 from mylog import log
+from pathlib import Path
 from nodeutils import find, parse, pp
 
-from collections import namedtuple
 
-LocalVariable = namedtuple('LocalVariable', ['type', 'name', 'children'])
-
-
-def locals_for_param(type, varname):
+def stmts_for_param(type, varname, stack=[]):
     """
     Yields input variables for type t's fields, down to primitives
     """
 
-    if type.kind == TypeKind.ELABORATED:
+    type = type.get_canonical()
+
+    decls = []
+    inits = []
+    shift_argv = 'shift_argi()'
+
+    log.debug(f'variable {varname} type {type.spelling} (kind {type.kind})')
+
+    if not (type.kind == TypeKind.FUNCTIONPROTO or (type.kind == TypeKind.POINTER and type.get_pointee().kind == TypeKind.FUNCTIONPROTO)):
+        decls.append(f'{type.spelling} {varname.replace(".", "_")};')
+
+    if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
-        # TODO: Test for missing struct declaration
-        for fd in children:
-            yield from locals_for_param(fd.type, fd.displayname)
-        yield LocalVariable(type, varname, len(children))
+        inits.append(f'// assign fields for {varname}')
+        if any(children):
+            for child in children:
+                child_varname = f'{varname}.{child.spelling}'
+                if child.kind == CursorKind.UNION_DECL:
+                    pass
+                elif child.type.get_declaration().kind == CursorKind.UNION_DECL:
+                    inits.append(f'// TODO union {child_varname} = <{", ".join(c.spelling for c in child.type.get_declaration().get_children())}>;')
+                elif child.type.kind == TypeKind.POINTER:
+                    if child.type.spelling in (s.spelling for s in stack) or child.type.get_pointee() == type:
+                        inits.append(f'// TODO recursive {child_varname} = <{type.spelling}>;')
+                    else:
+                        if child.type.get_pointee().kind == TypeKind.CHAR_S:
+                            inits.append(f'{child_varname} = {shift_argv};')
+                        elif child.type.spelling in (s.spelling for s in stack):
+                            pass
+                        else:
+                            valname = f'{child.spelling.replace(".", "_")}_v'
+                            yield from stmts_for_param(child.type.get_pointee(), valname, stack=stack+[child.type])
+                            inits.append(f'{child_varname} = &{valname};')
+                else:
+                    child_inits = zip(*stmts_for_param(child.type, f'{child_varname}', stack=stack+[child.type]))
+                    yield from (([], c) for l in child_inits for c in l)
+        else:
+            log.warning(f'no fields found for type {type.spelling} (kind {type.kind})')
     elif type.kind == TypeKind.POINTER:
-        if type.spelling == 'char *':
-            yield LocalVariable(type, varname, 0)
+        if type.get_pointee().kind == TypeKind.CHAR_S:
+            inits.append(f'{varname} = {shift_argv};')
+        elif type.get_pointee().kind == TypeKind.FUNCTIONPROTO:
+            inits.append(f'// TODO functionptr {varname} = <{type.spelling}>;')
         else:
-            # TODO: Currently inits all ptrs as single values. What about arrays?
-            yield from locals_for_param(type.get_pointee(), f'{varname}_v')
-            yield LocalVariable(type, varname, 1)
-    elif type.kind == TypeKind.INT:
-        yield LocalVariable(type, varname)
-    elif type.kind == TypeKind.UINT:
-        yield LocalVariable(type, varname)
+            valname = f'{varname}_v'
+            yield from stmts_for_param(type.get_pointee(), valname, stack=stack+[type])
+            if type.get_pointee().kind != TypeKind.FUNCTIONPROTO:
+                inits.append(f'{varname} = &{valname};')
+    elif type.kind == TypeKind.INT or \
+        type.kind == TypeKind.SHORT or \
+        type.kind == TypeKind.LONG or \
+        type.kind == TypeKind.LONGLONG or \
+        type.kind == TypeKind.INT128 or \
+        type.kind == TypeKind.ENUM:
+        inits.append(f'{varname} = atoi({shift_argv});')
+    elif type.kind == TypeKind.UINT or \
+        type.kind == TypeKind.ULONG or \
+        type.kind == TypeKind.ULONGLONG or \
+        type.kind == TypeKind.UINT128:
+        inits.append(f'{varname} = strtoul({shift_argv}, NULL, 10);')
+    elif type.kind == TypeKind.DOUBLE or type.kind == TypeKind.LONGDOUBLE:
+        inits.append(f'{varname} = strtod({shift_argv}, NULL);')
+    elif type.kind == TypeKind.FLOAT:
+        inits.append(f'{varname} = atof({shift_argv});')
     elif type.kind == TypeKind.CHAR_S:
-        yield LocalVariable(type, varname)
+        inits.append(f'{varname} = {shift_argv}[0];')
+    elif type.kind == TypeKind.FUNCTIONPROTO:
+        pass
     else:
-        raise Exception('local variables unhandled kind', type.kind)
+        inits.append(f'// TODO unhandled {varname} = <{type.spelling}>;')
+    
+    yield decls, inits
 
 
-def initializers_for_locals(vars):
+def stmtgen(parameters):
     """
-    Yields C statements to declare and read values for input vars.
+    Get declaration and initializer statements for the given parameters
     """
+    decls = []
+    inits = []
 
-    def declare(v):
-        return f'{v.type.spelling} {v.name};'
+    for i, parm in enumerate(parameters):
+        stmts = list(stmts_for_param(parm.type, parm.displayname))
+        parm_decls, parm_inits = zip(*stmts)
+        log.info(
+            f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
+        for v, i in stmts:
+            log.debug(f'local variable {v} has initializer(s) {i}')
+        decls += (i for ilist in parm_decls for i in ilist)
+        inits += (i for ilist in parm_inits for i in ilist)
 
-    def throwaway_getline(var_name, fmt):
-        """
-        Declare a string and string length variable, call getline, assign result then free the buffer
-        """
-
-        str_name = f'{var_name}_s'
-        strlen_name = f'{var_name}_sn'
-        return f'''// BEGIN read value for {var_name}
-char *{str_name}=NULL;
-size_t {strlen_name}=0;
-printf("{var_name}: ");
-getline(&{str_name}, &{strlen_name}, stdin);
-{fmt.format(var_name, str_name, strlen_name)} // provided line
-free({str_name});
-// END read value for {var_name}'''
-
-    def read_and_assign(i, v):
-        vars_so_far = vars[:i]
-        if v.type.kind == TypeKind.ELABORATED:
-            assignments = '\n'.join(
-                f'{v.name}.{c.name} = {c.name};' for c in reversed(vars_so_far[-v.children:]))
-            return f'''// BEGIN assign fields of {v.name}
-{assignments}
-// END assign fields of {v.name}'''
-        elif v.type.kind == TypeKind.POINTER:
-            if v.type.spelling == 'char *':
-                return throwaway_getline(v.name, '{0} = malloc({2});\nstrcpy({0}, {1});')
-            else:
-                # TODO: Currently inits all ptrs as single values. What about arrays?
-                return f'''// BEGIN assign ptr {v.name}
-{v.name} = &{vars_so_far[-v.children].name};
-// END assign ptr {v.name}'''
-        elif v.type.kind == TypeKind.INT:
-            return throwaway_getline(v.name, '{0} = atoi({1});')
-        elif v.type.kind == TypeKind.UINT:
-            return throwaway_getline(v.name, '{0} = strtoul({1}, NULL, 10);')
-        elif v.type.kind == TypeKind.CHAR_S:
-            return throwaway_getline(v.name, '{0} = {1}[0];')
-        else:
-            raise Exception('definitions unhandled kind', type.kind)
-
-    def cleanup(v):
-        if v.type.kind == TypeKind.POINTER and v.type.spelling == 'char *':
-            return f'free({v.name});'
-
-    for i, v in enumerate(vars):
-        yield (declare(v), read_and_assign(i, v), cleanup(v))
+    return decls, inits
 
 
-def codegen(fn_name, param_names, initializers):
+def callgen(fn, parameters):
     """
-    Generate code for parameter names and initializers
+    Generate a call to the function, with the given parameters
     """
-    decls, defs, cleanups = ('\n'.join(filter(lambda x: x, l))
-                             for l in zip(*initializers))
+    parameters_text = ', '.join(p.spelling for p in parameters)
+    return f'{fn.spelling}({parameters_text});'
 
-    return f'''
-// BEGIN test harness
+
+def codegen(target):
+    """
+    Generate code for parameter names and code statements
+    """
+    
+    parameters = list(target.get_arguments())
+    log.info(f'target function has {len(parameters)} parameters')
+
+    decls, inits = stmtgen(parameters)
+    call = callgen(target, parameters)
+
+    template = '''
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-int main() {{
-// BEGIN declare input variables
-{decls}
-// END declare input variables
+// argi is used for iterating through the input arguments
+int argi = 1;
+int global_argc;
+char **global_argv;
 
-// BEGIN read input variables
-{defs}
-// END read input variables
-
-// BEGIN call into segment
-{fn_name}({", ".join(param_names)});
-// END call into segment
-
-// BEGIN cleanup input variables
-{cleanups}
-// END cleanup input variables
+char *shift_argi() {{
+    int old_argi = argi;
+    argi++;
+    assert(old_argi < global_argc);
+    char *return_value = global_argv[old_argi];
+    if (strcmp(return_value, "NULL") == 0) {{
+        return_value = NULL;
+    }}
+    return return_value;
 }}
-// END test harness
+
+int main(int argc, char **argv) {{
+global_argc = argc;
+global_argv = argv;
+
+// declarations
+{declarations}
+
+// initializers
+{initializers}
+
+// call into segment
+{call}
+}}
 '''
-
-
-def get_initializers(parameters):
-    """
-    Get initializer statements for the given parameters
-    """
-    initializers = []
-    for i, parm in enumerate(parameters):
-        locals = list(locals_for_param(parm.type, parm.displayname))
-        this_boy_inits = list(initializers_for_locals(locals))
-        initializers += this_boy_inits
-        log.info(
-            f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
-        for l in locals:
-            log.debug(f'local variable {l}')
-    return initializers
+    sub = template.format(declarations='\n'.join(decls), initializers='\n'.join(inits), call=call)
+    return sub
 
 
 def select_target(func_name, cur):
@@ -177,30 +198,24 @@ def get_clang_flags(args):
     Aggregate clang flags from args and Makefile if specified
     """
     clang_flags = args.clang_flags[0].split() if args.clang_flags else []
-    makefile = args.makefile[0] if args.makefile else None
-    if makefile:
-        with open(makefile, 'r') as f:
-            for line in f.readlines():
-                m = re.search(r'CFLAGS:=(.*)', line)
-                if m:
-                    clang_flags += m.group(1).split()
+    if args.directory:
+        makefile = args.directory/'Makefile'
+        log.debug(f'path to Makefile: {makefile}')
+        assert(makefile.is_file())
+        clang_flags += [f'-I{args.directory.absolute()}']
+        clang_flags += re.findall(r'-I[^\s]+', open(makefile, 'r').read())
     return clang_flags
 
 
-def output(args, test_harness):
+def output(args, input_text, test_harness):
     """
     Output test_harness to file or stdout, depending on args
     """
     outfile = args.output[0] if args.output else None
 
-    with open(args.input_file, 'r') as f:
-        input_text = f.read()
-    if '// BEGIN test harness' in input_text:
-        log.critical('Test harness exists in the input file; please delete it')
-        exit(1)
-    raw_text = f'''//BEGIN original file
+    raw_text = f'''
 {input_text}
-//END original file
+// test harness
 {test_harness}
 '''
 
@@ -208,76 +223,88 @@ def output(args, test_harness):
         log.info(f'writing to output file {outfile}')
         with open(outfile, 'w') as f:
             f.write(raw_text)
-        if args.format:
+        if not args.no_format:
             if shutil.which('clang-format'):
-                subprocess.check_call(['clang-format', outfile, '-i'])
+                subprocess.call(['clang-format', outfile, '-i', '-style=Google'])
             else:
-                log.warn('requested format but clang-format not found')
+                log.warn('clang-format not found')
     else:
         log.info('generated test harness:')
-        if args.format:
+        if not args.no_format:
             if shutil.which('clang-format'):
                 tmp_filename = '/tmp/parse.py.fmt.c'
+                log.info(f'writing to temporary file {tmp_filename}')
                 with open(tmp_filename, 'w') as f:
                     f.write(raw_text)
-                subprocess.check_call(['clang-format', tmp_filename, '-i'])
+                subprocess.call(['clang-format', tmp_filename, '-i', '-style=Google'])
                 with open(tmp_filename, 'r') as f:
                     formatted_text = f.read()
                 os.remove(tmp_filename)
                 print(formatted_text)
             else:
-                log.info('requested format but clang-format not found')
+                log.warn('clang-format not found')
         else:
             print(raw_text)
 
 
+def read_input_file(translation_unit):
+    input_lines = open(translation_unit.spelling, 'r').readlines()
+    def is_main_definition(n):
+        return n.kind == CursorKind.FUNCTION_DECL and n.is_definition() and n.spelling == 'main'
+    main_def = next(iter(find(translation_unit, is_main_definition)), None)
+    if main_def:
+        start, end = main_def.extent.start.line, main_def.extent.end.line
+        input_lines = input_lines[:start-1] + input_lines[end:]
+    return ''.join(input_lines)
+
+
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input_file', help="Path to the input file")
+    parser.add_argument('input_file', nargs='?', help="Path to the input file. Can be a full filepath or, if -d is specified a path relative to the project directory. Omitting causes harn to search automatically for an input file named something close to main.c")
+    parser.add_argument(
+        '-d', '--directory', help='Directory of input project', type=str, default=Path.cwd())
     parser.add_argument(
         '-o', '--output', help='Path to the output file', type=str, nargs=1)
     parser.add_argument('-c', '--clang_flags',
                         help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
     parser.add_argument(
-        '-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
-
-    parser.add_argument(
-        '-f', '--format', help='Format the output file with clang-format', action="store_true")
+        '-f', '--no-format', help='Don\'t format the output file with clang-format', action="store_true")
     parser.add_argument(
         '-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
-    parser.add_argument(
-        '-l', '--logs', help='Print informational logs to stdout', action="store_true")
-    parser.add_argument(
-        '-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
+    parser.add_argument('-l', '--log-level', help='Display logs at a certain level (ex. DEBUG, INFO, ERROR)', type=str)
 
-    return parser.parse_args()
+    arguments = parser.parse_args()
+    if isinstance(arguments.directory, str):
+        arguments.directory = Path(arguments.directory)
+    return arguments
 
 
 def main():
     args = get_args()
-    if args.logs:
-        log.setLevel(logging.INFO)
-    elif args.verbose:
-        log.setLevel(logging.DEBUG)
+    if args.log_level:
+        log.setLevel(logging.getLevelName(args.log_level))
+    else:
+        log.setLevel(logging.ERROR)
 
     func_name = args.func_name[0] if args.func_name else None
     clang_flags = get_clang_flags(args)
+    log.info(f'clang_flags={clang_flags}')
 
     try:
-        infile = args.input_file
-        log.info(f'clang_flags={clang_flags}')
-
+        if args.input_file:
+            infile = Path(args.input_file)
+            if not infile.is_file():
+                infile = args.directory / args.input_file
+        else:
+            infile = next(args.directory.glob('**/*main*.c'))
+        assert(infile.is_file())
+        log.info(f'infile={infile}')
         cur = parse(infile, args=clang_flags)
 
         target = select_target(func_name, cur)
-
-        parmesan = list(find(target, CursorKind.PARM_DECL))
-        log.info(f'target function has {len(parmesan)} parameters')
-        inits = get_initializers(parmesan)
-
-        param_names = (p.displayname for p in parmesan)
-        test_harness = codegen(target.spelling, param_names, inits)
-        output(args, test_harness)
+        test_harness = codegen(target)
+        input_text = read_input_file(cur)
+        output(args, input_text, test_harness)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
         exit(1)
