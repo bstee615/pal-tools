@@ -14,6 +14,7 @@ import logging
 import re
 
 from mylog import log
+from pathlib import Path
 from nodeutils import find, parse, pp
 
 
@@ -193,13 +194,13 @@ def get_clang_flags(args):
     Aggregate clang flags from args and Makefile if specified
     """
     clang_flags = args.clang_flags[0].split() if args.clang_flags else []
-    makefile = args.makefile[0] if args.makefile else None
-    if makefile:
-        with open(makefile, 'r') as f:
-            for line in f.readlines():
-                m = re.search(r'CFLAGS:=(.*)', line)
-                if m:
-                    clang_flags += m.group(1).split()
+    if args.directory:
+        args.directory = Path(args.directory)
+        makefile = args.directory/'Makefile'
+        log.debug(f'path to Makefile: {makefile}')
+        assert(makefile.is_file())
+        clang_flags += [f'-I{args.directory.absolute()}']
+        clang_flags += re.findall(r'-I[^\s]+', open(makefile, 'r').read())
     return clang_flags
 
 
@@ -258,11 +259,11 @@ def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('input_file', help="Path to the input file")
     parser.add_argument(
+        '-d', '--directory', help='Directory of input project', type=str)
+    parser.add_argument(
         '-o', '--output', help='Path to the output file', type=str, nargs=1)
     parser.add_argument('-c', '--clang_flags',
                         help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
-    parser.add_argument(
-        '-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
     parser.add_argument(
         '-f', '--no-format', help='Don\'t format the output file with clang-format', action="store_true")
     parser.add_argument(
