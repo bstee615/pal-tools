@@ -17,7 +17,7 @@ from mylog import log
 from nodeutils import find, parse, pp
 
 
-def stmts_for_param(type, varname, declare=True):
+def stmts_for_param(type, varname, declare=True, stack=[]):
     """
     Yields input variables for type t's fields, down to primitives
     """
@@ -28,6 +28,8 @@ def stmts_for_param(type, varname, declare=True):
     inits = []
     shift_argv = 'shift_argi()'
 
+    log.debug(f'variable {varname} type {type.spelling} (kind {type.kind})')
+
     if declare:
         decls.append(f'{type.spelling} {varname};')
 
@@ -35,11 +37,14 @@ def stmts_for_param(type, varname, declare=True):
         td = type.get_declaration()
         children = list(td.get_children())
         if any(children):
-        for fd in children:
-            childname = f'{varname}.{fd.displayname}'
-            yield from stmts_for_param(fd.type, childname, declare=False)
+            for fd in children:
+                childname = f'{varname}.{fd.displayname}'
+                if type in stack:
+                    inits.append(f'// TODO recursive type {varname}:{type.spelling}')
+                else:
+                    yield from stmts_for_param(fd.type, childname, declare=False, stack=stack+[type])
         else:
-            log.warning(f'no fields found for type {type.kind}')
+            log.warning(f'no fields found for type {type.spelling} (kind {type.kind})')
             inits.append(f'// TODO assign fields to {varname}')
     elif type.kind == TypeKind.POINTER:
         if type.get_pointee().kind == TypeKind.CHAR_S:
@@ -47,7 +52,7 @@ def stmts_for_param(type, varname, declare=True):
         else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
             valname = f'{varname}_v'
-            yield from stmts_for_param(type.get_pointee(), valname)
+            yield from stmts_for_param(type.get_pointee(), valname, stack=stack+[type])
             inits.append(f'{varname} = &{valname};')
     elif type.kind == TypeKind.INT or \
         type.kind == TypeKind.SHORT or \
@@ -64,7 +69,7 @@ def stmts_for_param(type, varname, declare=True):
     elif type.kind == TypeKind.CHAR_S:
         inits.append(f'{varname} = {shift_argv}[0];')
     else:
-        yield f'// TODO print {varname}'
+        inits.append(f'// TODO print {varname}')
     
     yield decls, inits
 
@@ -78,7 +83,6 @@ def stmtgen(parameters):
 
     for i, parm in enumerate(parameters):
         decls_and_inits = list(stmts_for_param(parm.type, parm.displayname))
-        log.debug(decls_and_inits)
         parm_decls, parm_inits = zip(*decls_and_inits)
         log.info(
             f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
