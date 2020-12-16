@@ -257,7 +257,7 @@ def read_input_file(translation_unit):
 
 def get_args():
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('input_file', help="Path to the input file")
+    parser.add_argument('input_file', help="Path to the input file. Can be a full filepath or, if -d is specified a path relative to the project directory.")
     parser.add_argument(
         '-d', '--directory', help='Directory of input project', type=str)
     parser.add_argument(
@@ -282,10 +282,14 @@ def main():
 
     func_name = args.func_name[0] if args.func_name else None
     clang_flags = get_clang_flags(args)
+    log.info(f'clang_flags={clang_flags}')
 
     try:
-        infile = args.input_file
-        log.info(f'clang_flags={clang_flags}')
+        infile = Path(args.input_file)
+        if not infile.is_file():
+            infile = Path(args.directory) / args.input_file
+        assert(infile.is_file())
+        log.info(f'infile={infile}')
         cur = parse(infile, args=clang_flags)
 
         target = select_target(func_name, cur)
