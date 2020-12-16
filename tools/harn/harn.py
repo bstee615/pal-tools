@@ -41,7 +41,7 @@ def stmts_for_param(type, varname, declare=True):
             # TODO: Currently inits all ptrs as single values. What about arrays?
             valname = f'{varname}_v'
             yield from stmts_for_param(type.get_pointee(), valname)
-            inits.append(f'{varname} = &{valname}')
+            inits.append(f'{varname} = &{valname};')
     elif type.kind == TypeKind.INT or \
         type.kind == TypeKind.SHORT or \
         type.kind == TypeKind.LONG or \
@@ -179,16 +179,17 @@ def output(args, test_harness):
         log.info(f'writing to output file {outfile}')
         with open(outfile, 'w') as f:
             f.write(raw_text)
-        if args.format:
+        if not args.no_format:
             if shutil.which('clang-format'):
                 subprocess.check_call(['clang-format', outfile, '-i'])
             else:
-                log.warn('requested format but clang-format not found')
+                log.warn('clang-format not found')
     else:
         log.info('generated test harness:')
-        if args.format:
+        if not args.no_format:
             if shutil.which('clang-format'):
                 tmp_filename = '/tmp/parse.py.fmt.c'
+                log.info(f'writing to temporary file {tmp_filename}')
                 with open(tmp_filename, 'w') as f:
                     f.write(raw_text)
                 subprocess.check_call(['clang-format', tmp_filename, '-i'])
@@ -197,7 +198,7 @@ def output(args, test_harness):
                 os.remove(tmp_filename)
                 print(formatted_text)
             else:
-                log.info('requested format but clang-format not found')
+                log.warn('clang-format not found')
         else:
             print(raw_text)
 
@@ -211,9 +212,8 @@ def get_args():
                         help='Flags to pass to clang e.g. -I</path/to/include>', type=str, nargs=1)
     parser.add_argument(
         '-m', '--makefile', help='Path to Makefile containing flags to pass to clang in CFLAGS variable e.g. CFLAGS:=-I</path/to/include>', type=str, nargs=1)
-
     parser.add_argument(
-        '-f', '--format', help='Format the output file with clang-format', action="store_true")
+        '-f', '--no-format', help='Don\'t format the output file with clang-format', action="store_true")
     parser.add_argument(
         '-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (ex. DEBUG, INFO, ERROR)', type=str)
@@ -225,6 +225,8 @@ def main():
     args = get_args()
     if args.log_level:
         log.setLevel(logging.getLevelName(args.log_level))
+    else:
+        log.setLevel(logging.ERROR)
 
     func_name = args.func_name[0] if args.func_name else None
     clang_flags = get_clang_flags(args)
