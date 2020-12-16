@@ -17,7 +17,7 @@ from mylog import log
 from nodeutils import find, parse, pp
 
 
-def stmts_for_param(type, varname, declare=True):
+def stmts_for_param(type, varname, declare=True, stack=[]):
     """
     Yields input variables for type t's fields, down to primitives
     """
@@ -30,32 +30,48 @@ def stmts_for_param(type, varname, declare=True):
 
     log.debug(f'variable {varname} type {type.spelling} (kind {type.kind})')
 
-    if declare:
-        decls.append(f'{type.spelling} {varname};')
+    if declare and not (type.kind == TypeKind.FUNCTIONPROTO or (type.kind == TypeKind.POINTER and type.get_pointee().kind == TypeKind.FUNCTIONPROTO)):
+        decls.append(f'{type.spelling} {varname.replace(".", "_")};')
 
     if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
-        inits.append(f'// TODO assign fields for {varname}')
+        inits.append(f'// assign fields for {varname}')
         if any(children):
             for child in children:
+                child_varname = f'{varname}.{child.spelling}'
                 if child.kind == CursorKind.UNION_DECL:
-                    if child.is_anonymous():
-                        inits.append(f'// {varname}.<anonymous>')
+                    pass
+                elif child.type.get_declaration().kind == CursorKind.UNION_DECL:
+                    inits.append(f'// TODO union {child_varname} = <{", ".join(c.spelling for c in child.type.get_declaration().get_children())}>;')
+                elif child.type.kind == TypeKind.POINTER:
+                    if child.type.spelling in (s.spelling for s in stack) or child.type.get_pointee() == type:
+                        inits.append(f'// TODO recursive {child_varname} = <{type.spelling}>;')
                     else:
-                        inits.append(f'// {varname}.{child.spelling}')
+                        if child.type.get_pointee().kind == TypeKind.CHAR_S:
+                            inits.append(f'{child_varname} = {shift_argv};')
+                        elif child.type.spelling in (s.spelling for s in stack):
+                            pass
+                        else:
+                            valname = f'{child.spelling.replace(".", "_")}_v'
+                            yield from stmts_for_param(child.type.get_pointee(), valname, stack=stack+[child.type])
+                            inits.append(f'{child_varname} = &{valname};')
                 else:
-                    inits.append(f'// {varname}.{child.spelling} = {child.spelling};')
+                    child_decls, child_inits = zip(*stmts_for_param(child.type, f'{child_varname}', stack=stack+[child.type]))
+                    # decls += (f'{c}' for l in child_decls for c in l)
+                    inits += (f'{c}' for l in child_inits for c in l)
         else:
             log.warning(f'no fields found for type {type.spelling} (kind {type.kind})')
     elif type.kind == TypeKind.POINTER:
         if type.get_pointee().kind == TypeKind.CHAR_S:
             inits.append(f'{varname} = {shift_argv};')
+        elif type.get_pointee().kind == TypeKind.FUNCTIONPROTO:
+            inits.append(f'// TODO functionptr {varname} = <{type.spelling}>;')
         else:
-            # TODO: Currently inits all ptrs as single values. What about arrays?
             valname = f'{varname}_v'
-            yield from stmts_for_param(type.get_pointee(), valname)
-            inits.append(f'{varname} = &{valname};')
+            yield from stmts_for_param(type.get_pointee(), valname, stack=stack+[type])
+            if type.get_pointee().kind != TypeKind.FUNCTIONPROTO:
+                inits.append(f'{varname} = &{valname};')
     elif type.kind == TypeKind.INT or \
         type.kind == TypeKind.SHORT or \
         type.kind == TypeKind.LONG or \
@@ -70,8 +86,10 @@ def stmts_for_param(type, varname, declare=True):
         inits.append(f'{varname} = strtoul({shift_argv}, NULL, 10);')
     elif type.kind == TypeKind.CHAR_S:
         inits.append(f'{varname} = {shift_argv}[0];')
+    elif type.kind == TypeKind.FUNCTIONPROTO:
+        pass
     else:
-        inits.append(f'// TODO print {varname}')
+        inits.append(f'// TODO unhandled {varname} = <{type.spelling}>;')
     
     yield decls, inits
 
@@ -84,13 +102,12 @@ def stmtgen(parameters):
     inits = []
 
     for i, parm in enumerate(parameters):
-        parm_decls, parm_inits = zip(*stmts_for_param(parm.type, parm.displayname))
+        stmts = list(stmts_for_param(parm.type, parm.displayname))
+        parm_decls, parm_inits = zip(*stmts)
         log.info(
             f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
-        for i in parm_decls:
-            log.debug(f'local variable {i}')
-        for i in parm_inits:
-            log.debug(f'initializer {i}')
+        for v, i in stmts:
+            log.debug(f'local variable {v} has initializer(s) {i}')
         decls += (i for ilist in parm_decls for i in ilist)
         inits += (i for ilist in parm_inits for i in ilist)
 
@@ -205,7 +222,7 @@ def output(args, input_text, test_harness):
             f.write(raw_text)
         if not args.no_format:
             if shutil.which('clang-format'):
-                subprocess.check_call(['clang-format', outfile, '-i'])
+                subprocess.call(['clang-format', outfile, '-i', '-style=Google'])
             else:
                 log.warn('clang-format not found')
     else:
@@ -216,7 +233,7 @@ def output(args, input_text, test_harness):
                 log.info(f'writing to temporary file {tmp_filename}')
                 with open(tmp_filename, 'w') as f:
                     f.write(raw_text)
-                subprocess.check_call(['clang-format', tmp_filename, '-i'])
+                subprocess.call(['clang-format', tmp_filename, '-i', '-style=Google'])
                 with open(tmp_filename, 'r') as f:
                     formatted_text = f.read()
                 os.remove(tmp_filename)
