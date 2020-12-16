@@ -1,6 +1,7 @@
 #!/bin/python3
 
-""" Find all usages of some type
+"""
+Generate a test harness for a fault signature
 """
 
 from clang.cindex import CursorKind, TypeKind
@@ -23,7 +24,7 @@ def stmts_for_param(type, varname, declare=True):
 
     decls = []
     inits = []
-    shift_argv = 'argv[argi++]'
+    shift_argv = 'shift_argi()'
 
     if declare:
         decls.append(f'{type.spelling} {varname};')
@@ -105,13 +106,24 @@ def codegen(target):
     call = callgen(target, parameters)
 
     template = '''
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-int main(int argc, char **argv) {{
 // argi is used for iterating through the input arguments
 int argi = 1;
+int global_argc;
+
+int shift_argi() {{
+    int old_argi = argi;
+    argi++;
+    assert(argi < global_argc);
+    return old_argi;
+}}
+
+int main(int argc, char **argv) {{
+global_argc = argc;
 
 // declarations
 {declarations}
