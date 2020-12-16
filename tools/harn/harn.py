@@ -15,153 +15,114 @@ import re
 from mylog import log
 from nodeutils import find, parse, pp
 
-from collections import namedtuple
 
-LocalVariable = namedtuple('LocalVariable', ['type', 'name', 'children'])
-
-
-def locals_for_param(type, varname):
+def stmts_for_param(type, varname, declare=True):
     """
     Yields input variables for type t's fields, down to primitives
     """
 
+    decls = []
+    inits = []
+    shift_argv = 'argv[argi++]'
+
+    if declare:
+        decls.append(f'{type.spelling} {varname};')
+
     if type.kind == TypeKind.ELABORATED or type.kind == TypeKind.RECORD:
         td = type.get_declaration()
         children = list(td.get_children())
-        # TODO: Test for missing struct declaration
         for fd in children:
-            yield from locals_for_param(fd.type, fd.displayname)
-        yield LocalVariable(type, varname, len(children))
+            childname = f'{varname}.{fd.displayname}'
+            yield from stmts_for_param(fd.type, childname, declare=False)
     elif type.kind == TypeKind.POINTER:
         if type.get_pointee().kind == TypeKind.CHAR_S:
-            yield LocalVariable(type, varname, 0)
+            inits.append(f'{varname} = {shift_argv};')
         else:
             # TODO: Currently inits all ptrs as single values. What about arrays?
-            yield from locals_for_param(type.get_pointee(), f'{varname}_v')
-            yield LocalVariable(type, varname, 1)
+            valname = f'{varname}_v'
+            yield from stmts_for_param(type.get_pointee(), valname)
+            inits.append(f'{varname} = &{valname}')
     elif type.kind == TypeKind.INT or \
         type.kind == TypeKind.SHORT or \
         type.kind == TypeKind.LONG or \
         type.kind == TypeKind.LONGLONG or \
         type.kind == TypeKind.INT128 or \
         type.kind == TypeKind.ENUM:
-        yield LocalVariable(type, varname)
+        inits.append(f'{varname} = atoi({shift_argv});')
     elif type.kind == TypeKind.UINT or \
         type.kind == TypeKind.ULONG or \
         type.kind == TypeKind.ULONGLONG or \
         type.kind == TypeKind.UINT128:
-        yield LocalVariable(type, varname)
+        inits.append(f'{varname} = strtoul({shift_argv}, NULL, 10);')
     elif type.kind == TypeKind.CHAR_S:
-        yield LocalVariable(type, varname)
+        inits.append(f'{varname} = {shift_argv}[0];')
     else:
-        yield f'// TODO benjis: print {varname}'
+        yield f'// TODO print {varname}'
+    
+    yield decls, inits
 
 
-def initializers_for_locals(vars):
+def codegen(call, stmts):
     """
-    Yields C statements to declare and read values for input vars.
+    Generate code for parameter names and code statements
     """
 
-    def declare(v):
-        return f'{v.type.spelling} {v.name};'
-
-    def throwaway_getline(var_name, fmt):
-        """
-        Declare a string and string length variable, call getline, assign result then free the buffer
-        """
-
-        str_name = f'{var_name}_s'
-        strlen_name = f'{var_name}_sn'
-        return f'''// BEGIN read value for {var_name}
-char *{str_name}=NULL;
-size_t {strlen_name}=0;
-printf("{var_name}: ");
-getline(&{str_name}, &{strlen_name}, stdin);
-{fmt.format(var_name, str_name, strlen_name)} // provided line
-free({str_name});
-// END read value for {var_name}'''
-
-    def read_and_assign(i, v):
-        vars_so_far = vars[:i]
-        if v.type.kind == TypeKind.ELABORATED:
-            assignments = '\n'.join(
-                f'{v.name}.{c.name} = {c.name};' for c in reversed(vars_so_far[-v.children:]))
-            return f'''// BEGIN assign fields of {v.name}
-{assignments}
-// END assign fields of {v.name}'''
-        elif v.type.kind == TypeKind.POINTER:
-            if v.type.spelling == 'char *':
-                return throwaway_getline(v.name, '{0} = malloc({2});\nstrcpy({0}, {1});')
-            else:
-                # TODO: Currently inits all ptrs as single values. What about arrays?
-                return f'''// BEGIN assign ptr {v.name}
-{v.name} = &{vars_so_far[-v.children].name};
-// END assign ptr {v.name}'''
-        elif v.type.kind == TypeKind.INT:
-            return throwaway_getline(v.name, '{0} = atoi({1});')
-        elif v.type.kind == TypeKind.UINT:
-            return throwaway_getline(v.name, '{0} = strtoul({1}, NULL, 10);')
-        elif v.type.kind == TypeKind.CHAR_S:
-            return throwaway_getline(v.name, '{0} = {1}[0];')
-        else:
-            raise Exception('definitions unhandled kind', type.kind)
-
-    def cleanup(v):
-        if v.type.kind == TypeKind.POINTER and v.type.spelling == 'char *':
-            return f'free({v.name});'
-
-    for i, v in enumerate(vars):
-        yield (declare(v), read_and_assign(i, v), cleanup(v))
-
-
-def codegen(fn_name, param_names, initializers):
-    """
-    Generate code for parameter names and initializers
-    """
-    decls, defs, cleanups = ('\n'.join(filter(lambda x: x, l))
-                             for l in zip(*initializers))
+    body = stmts + call
 
     return f'''
-// BEGIN test harness
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 int main() {{
-// BEGIN declare input variables
-{decls}
-// END declare input variables
-
-// BEGIN read input variables
-{defs}
-// END read input variables
-
-// BEGIN call into segment
-{fn_name}({", ".join(param_names)});
-// END call into segment
-
-// BEGIN cleanup input variables
-{cleanups}
-// END cleanup input variables
+{body}
 }}
-// END test harness
 '''
 
 
-def get_initializers(parameters):
+def stmtgen(parameters):
     """
-    Get initializer statements for the given parameters
+    Get declaration and initializer statements for the given parameters
     """
-    initializers = []
+    decls = []
+    inits = []
+
     for i, parm in enumerate(parameters):
-        locals = list(locals_for_param(parm.type, parm.displayname))
-        this_boy_inits = list(initializers_for_locals(locals))
-        initializers += this_boy_inits
+        decls_and_inits = list(stmts_for_param(parm.type, parm.displayname))
+        log.debug(decls_and_inits)
+        parm_decls, parm_inits = zip(*decls_and_inits)
+        decls += parm_decls
+        inits += parm_inits
         log.info(
-            f'parameter {i} {pp(parm)} produces {len(locals)} local variables')
-        for l in locals:
-            log.debug(f'local variable {l}')
-    return initializers
+            f'parameter {pp(parm)}({i}) produces {len(parm_decls)} local variable declarations and {len(parm_inits)} initializer statements')
+        for i in parm_decls:
+            log.debug(f'local variable {i}')
+        for i in parm_inits:
+            log.debug(f'initializer {i}')
+
+    decls_code = '\n'.join(i for ilist in decls for i in ilist)
+    inits_code = '\n'.join(i for ilist in inits for i in ilist)
+    return f'''
+// argi is used for iterating through the input arguments
+int argi = 1;
+
+// declarations
+{decls_code}
+
+// initializers
+{inits_code}
+'''
+
+
+def callgen(fn, parameters):
+    """
+    Generate a call to the function, with the given parameters
+    """
+    parameters_text = ', '.join(p.spelling for p in parameters)
+    return f'''
+// call into segment
+{fn.spelling}({parameters_text});
+'''
 
 
 def select_target(func_name, cur):
@@ -206,9 +167,9 @@ def output(args, test_harness):
     if '// BEGIN test harness' in input_text:
         log.critical('Test harness exists in the input file; please delete it')
         exit(1)
-    raw_text = f'''//BEGIN original file
+    raw_text = f'''
 {input_text}
-//END original file
+// test harness
 {test_harness}
 '''
 
@@ -253,20 +214,15 @@ def get_args():
         '-f', '--format', help='Format the output file with clang-format', action="store_true")
     parser.add_argument(
         '-n', '--func-name', help='Target a specific function (defaults to the last function in the input file)', type=str, nargs=1)
-    parser.add_argument(
-        '-l', '--logs', help='Print informational logs to stdout', action="store_true")
-    parser.add_argument(
-        '-v', '--verbose', help='Print informational and diagnostic logs to stdout', action="store_true")
+    parser.add_argument('-l', '--log-level', help='Display logs at a certain level (ex. DEBUG, INFO, ERROR)', type=str)
 
     return parser.parse_args()
 
 
 def main():
     args = get_args()
-    if args.logs:
-        log.setLevel(logging.INFO)
-    elif args.verbose:
-        log.setLevel(logging.DEBUG)
+    if args.log_level:
+        log.setLevel(logging.getLevelName(args.log_level))
 
     func_name = args.func_name[0] if args.func_name else None
     clang_flags = get_clang_flags(args)
@@ -281,10 +237,9 @@ def main():
 
         parmesan = find(target, CursorKind.PARM_DECL)
         log.info(f'target function has {len(parmesan)} parameters')
-        inits = get_initializers(parmesan)
-
-        param_names = (p.displayname for p in parmesan)
-        test_harness = codegen(target.spelling, param_names, inits)
+        stmts = stmtgen(parmesan)
+        call = callgen(target, parmesan)
+        test_harness = codegen(call, stmts)
         output(args, test_harness)
     except:
         log.exception(f'error generating test harness from {args.input_file}')
