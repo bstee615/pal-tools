@@ -105,7 +105,7 @@ def codegen(target):
     Generate code for parameter names and code statements
     """
     
-    parameters = find(target, CursorKind.PARM_DECL)
+    parameters = list(target.get_arguments())
     log.info(f'target function has {len(parameters)} parameters')
 
     decls, inits = stmtgen(parameters)
