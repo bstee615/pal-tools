@@ -18,8 +18,8 @@ def main():
         log.debug(f'setting log level to {args.log_level}')
 
     seg_c = args.segment_file
-    orig_c = args.original_file
-    log.debug(f'segment: {seg_c}, original: {orig_c}')
+    orig_dir = args.original_file
+    log.debug(f'segment: {seg_c}, original: {orig_dir}')
 
     clang_args = args.clang_args.split()
     if clang_args:
@@ -35,27 +35,36 @@ def main():
     parms = list(seg_target.get_arguments())
 
     log.debug(f'target: {pp(seg_target)}')
+    import re
+    target_name = re.match(r'helium_(.*)', seg_target.spelling).group(1)
     
-    orig_cur = parse(orig_c)
-    orig_funcdecls = find(orig_cur, CursorKind.FUNCTION_DECL)
-    orig_target = next(f.get_definition() for f in orig_funcdecls if is_the_same(f, seg_target))
-    orig_body = find(orig_target, lambda c: c.kind.is_statement())
+    from pathlib import Path
+    for orig_c in Path(orig_dir).glob('**/*.c'):
+        orig_cur = parse(orig_c)
+        orig_funcdecls = find(orig_cur, CursorKind.FUNCTION_DECL, verbose)
+        orig_target = next((f.get_definition() for f in orig_funcdecls if is_the_same(f, seg_target) and f.get_definition() is not None), None)
+        if orig_target is not None:
+            break
+    log.debug(f'target: {pp(orig_target)}')
+    orig_body = find(orig_target, lambda c: c is not None and c.kind.is_statement(), verbose=verbose)
     first_stmt = next(iter(orig_body))
     first_stmt_file, first_stmt_line = first_stmt.location.file.name, first_stmt.location.line
 
     diff = gen_patch(first_stmt_file, first_stmt_line, parms, args.array)
-    print(''.join(diff))
+    print('\n'.join(diff))
 
 def gen_patch(file, line, parms, array_expressions):
-    with open(file, 'r') as f:
-        fromlines = f.readlines()
+    stmts = []
+
+    stmts.append(f'b {file.split("/")[-1]}:{line}')
 
     arrays = dict(a.split(':') for a in array_expressions)
     log.debug(f'{len(parms)} parameters')
-    printfs = list(f'{p}\n' for p in gen_printfs(parms, arrays))
-    tolines = fromlines[:line] + printfs + fromlines[line:]
+    printfs = list(gen_printfs(parms, arrays))
+    log.debug(printfs)
+    stmts += printfs
 
-    return difflib.unified_diff(fromlines, tolines, fromfile=file, tofile=file)
+    return stmts
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -101,63 +110,11 @@ def gen_printfs(parms, arrays={}):
         if t.kind == TypeKind.TYPEDEF:
             t = t.get_canonical()
 
-        yield f'// name {name} type kind {t.kind}'
         log.debug(f'name {name} type kind {t.kind}')
-        log.debug(f'stack: {[pp(s) for s in stack]}')
 
-        if t.kind == TypeKind.INT or \
-            t.kind == TypeKind.SHORT or \
-            t.kind == TypeKind.LONG or \
-            t.kind == TypeKind.LONGLONG or \
-            t.kind == TypeKind.INT128:
-            yield f'printf("benjis:{name}:%d\\n", {name});'
-        elif t.kind == TypeKind.UINT or \
-            t.kind == TypeKind.ULONG or \
-            t.kind == TypeKind.ULONGLONG or \
-            t.kind == TypeKind.UINT128:
-            yield f'printf("benjis:{name}:%u\\n", {name});'
-        elif t.kind == TypeKind.ELABORATED or t.kind == TypeKind.RECORD:
-            if t not in stack:
-                log.debug(f'{len(list(t.get_fields()))} fields')
-                for c in t.get_fields():
-                    yield from genny(f'{name}.{c.spelling}', c.type, stack + [t])
-            else:
-                yield f'// TODO benjis: print recursive struct member {name}'
-        elif t.kind == TypeKind.POINTER:
-            yield f'if ({name}) {{'
-
-            if t.get_pointee().kind == TypeKind.CHAR_S:
-                yield f'printf("benjis:{name}:%s\\n", {name});'
-            else:
-                array = False
-                for key in arrays:
-                    if key == name:
-                        array = True
-                        i_name = f'{name.replace(".", "_").replace("*", "_").replace("(", "_").replace(")", "_")}_benjis_i'
-                        yield f'for(int {i_name} = 0; {i_name} < {arrays[name]}; {i_name} ++)'
-                        yield '{'
-                        yield from genny(f'{name}[{i_name}]', t.get_pointee(), stack + [t])
-                        yield '}'
-                if not array:
-                    yield from genny(f'(*{name})', t.get_pointee(), stack + [t])
-
-            yield f'}}'
-            yield f'else {{'
-            yield f'printf("benjis:{name}:(null)\\n");'
-            yield f'}}'
-        elif t.kind == TypeKind.ENUM:
-            yield f'printf("benjis:{name}:%d\\n", {name});'
-        elif t.kind == TypeKind.CHAR_S:
-            yield f'printf("benjis:{name}:%c\\n", {name});'
-        elif t.kind == TypeKind.CONSTANTARRAY:
-            size = t.get_array_size() # bless up
-            i_name = f'{name.replace(".", "_").replace("*", "_").replace("(", "_").replace(")", "_")}_benjis_i'
-            yield f'for(int {i_name} = 0; {i_name} < {size}; {i_name} ++)'
-            yield '{'
-            yield from genny(f'{name}[{i_name}]', t.get_array_element_type(), stack + [t])
-            yield '}'
-        else:
-            yield f'// TODO benjis: print {name}'
+        if t.kind == TypeKind.POINTER:
+            name = f'*{name}'
+        yield f'print {name}'
 
     for p in parms:
         yield from genny(p.spelling, p.type)
