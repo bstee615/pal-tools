@@ -24,7 +24,7 @@ def stmts_for_param(type, varname, declare=True):
 
     decls = []
     inits = []
-    shift_argv = 'argv[shift_argi()]'
+    shift_argv = 'shift_argi()'
 
     if declare:
         decls.append(f'{type.spelling} {varname};')
@@ -114,16 +114,18 @@ def codegen(target):
 // argi is used for iterating through the input arguments
 int argi = 1;
 int global_argc;
+char **global_argv;
 
-int shift_argi() {{
-    assert(argi < global_argc);
+char *shift_argi() {{
     int old_argi = argi;
     argi++;
-    return old_argi;
+    assert(old_argi < global_argc);
+    return global_argv[old_argi];
 }}
 
 int main(int argc, char **argv) {{
 global_argc = argc;
+global_argv = argv;
 
 // declarations
 {declarations}
