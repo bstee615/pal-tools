@@ -1,6 +1,7 @@
 #!/bin/python3
 
 from mylog import log
+import logging
 import argparse
 import pandas
 import os
@@ -18,6 +19,8 @@ def parse_args():
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     arguments = parser.parse_args()
     
+    if arguments.log_level:
+        log.setLevel(logging.getLevelName(arguments.log_level))
     if arguments.verbose:
         global verbose
         verbose = True
