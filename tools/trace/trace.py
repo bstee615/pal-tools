@@ -35,7 +35,7 @@ def parse_args():
         arguments.pin_root = Path.cwd() / arguments.pin_root
 
     if not arguments.pin_root.is_dir():
-        log.warn(f'{arguments.pin_root} is not a valid Pin installation. See {file_dir}/install.sh for the recommended method for installing Pin.')
+        log.error(f'{arguments.pin_root} is not a valid Pin installation. See {file_dir}/install.sh for the recommended method for installing Pin.')
         exit(1)
 
     return arguments
