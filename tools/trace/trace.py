@@ -79,12 +79,13 @@ class Pin:
         return_code = p.returncode
         log.debug(f'Ran "{cmd}" with return code {return_code}')
 
-        if return_code != 0:
+        # Pin tool exits 1 on success ¯\_(ツ)_/¯
+        if return_code != 1:
             log.warn(f'Error {return_code} running pin with command: "{cmd}"')
             log.warn(f'Echoing stderr:')
             log.warn(err.decode())
             log.warn(f'Echoing stdout:')
-            log.warn(err.decode())
+            log.warn(output.decode())
             return []
         
         if not logfile.is_file():
