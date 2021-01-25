@@ -1,6 +1,6 @@
 # Download Pin 3.16
 pin_url='https://software.intel.com/sites/landingpage/pintool/downloads/pin-3.16-98275-ge0db48c31-gcc-linux.tar.gz'
-rename_to=pin-3.16
+rename_to="$1" || 'pin-3.16'
 tools="$rename_to/source/tools"
 if [ ! -d $rename_to ]
 then
@@ -28,5 +28,13 @@ fi
 
 # Make trace-pintool
 pushd $trace_tool
-make || (echo Could not build Pin. Please cd to $trace_tool and run make. && exit 1)
+make
+make_ret=$?
 popd
+if [[ $make_ret != 0 ]]
+then
+    echo Could not build Pin. Please cd to $trace_tool and run make.
+    exit 1
+else
+    echo make completed successfully.
+fi

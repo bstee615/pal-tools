@@ -39,20 +39,20 @@ class Pin:
         """
         pin = Pin(pin_root)
         if not pin.is_valid():
-            log.error(f'{pin_root} is not a valid Pin installation.')
+            log.warn(f'{pin_root} is not a valid Pin installation.')
             if not install_sh.is_file():
                 log.error(f'Could not execute {install_sh}.')
                 exit(1)
             else:
-                log.error(f'See {install_sh} for the recommended method for installing Pin.')
-                yn = input('Should I install it there? [type y to install, anything else to quit]: ')
+                log.warn(f'See {install_sh} for the recommended method for installing Pin.')
+                yn = input(f'Should I install it at {pin_root}? [type y to install, anything else to quit]: ')
                 if yn == 'y':
-                    cmd = f'bash {install_sh.absolute()}'
+                    cmd = f'bash {install_sh.absolute()} {pin_root.name}'
                     log.debug(f'Running Bash script install.sh with "{cmd}" in directory "{pin_root}"')
                     proc = subprocess.Popen(cmd.split(), cwd=pin_root.parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                     stdout, _ = proc.communicate()
-                    for line in stdout.decode().splitlines():
-                        log.info(line)
+                    for l in stdout.decode().splitlines():
+                        log.info(f'**[{install_sh.name}]** {l}')
                     if proc.returncode == 0:
                         log.info(f'Ran {install_sh} successfully.')
                     else:
@@ -86,18 +86,16 @@ class Pin:
         logfile = Path('pin.log')
         cmd = f'{self.exe} -t {self.lib} -o {logfile} -- {target.absolute()}'
         args = cmd.split() + target_args
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, err = p.communicate()
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        stdout, _ = p.communicate()
         return_code = p.returncode
         log.debug(f'Ran "{cmd}" with return code {return_code}')
 
         # Pin tool exits 1 on success ¯\_(ツ)_/¯
-        if return_code != 1:
-            log.warn(f'Got {return_code} running pin with command: "{cmd}"')
-            log.warn(f'Echoing stderr:')
-            log.warn(err.decode())
-            log.warn(f'Echoing stdout:')
-            log.warn(output.decode())
+        log.info(f'Got return code {return_code} running pin with command: "{cmd}"')
+        log.info(f'Echoing output stream:')
+        for l in stdout.decode().splitlines():
+            log.info(f'**[{target.name}]** {l}')
         
         if not logfile.is_file():
             log.error(f'Something went wrong logging to {logfile}.')
