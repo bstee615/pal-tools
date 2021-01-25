@@ -17,9 +17,6 @@ from mylog import log
 import argparse
 import logging
 
-args = parse_args()
-verbose=False
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
@@ -35,6 +32,9 @@ def parse_args():
         log.debug(f'verbose logging enabled')
 
     return arguments
+
+args = parse_args()
+verbose = False
 
 def main():
     print('TODO {name}ify the things')
