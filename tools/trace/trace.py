@@ -16,11 +16,11 @@ def parse_args():
     default_pinroot = str(file_dir / 'pin-3.16')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('target', help='Target executable to trace. Must contain debug info (compiled with -g -O0).')
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
+    parser.add_argument('target', help='Target command to trace. Must contain debug info (compiled with -g -O0).', nargs='*')
     arguments = parser.parse_args()
     
     if arguments.log_level:
@@ -63,27 +63,27 @@ class Pin:
     def __init__(self, pin_root):
         self.root = Path(pin_root)
     
-    def run(self, target):
+    def run(self, target, target_args):
         """
         Run Pin. Collect results in temporary file pin.log
         and return a list of trace locations (filepath:lineno).
         """
         if not target.is_file():
-            log.warn(f'No such file for target executable: {target}')
+            log.error(f'No such file for target executable: {target}')
             return []
 
         exe = self.root / 'pin'
         lib = self.root / 'source/tools/trace-pintool/obj-intel64/trace.so'
         if not exe.is_file():
-            log.warn(f'No such file for Pin executable: {exe}')
+            log.error(f'No such file for Pin executable: {exe}')
             return []
         if not lib.is_file():
-            log.warn(f'No such file for trace-pintool: {lib}')
+            log.error(f'No such file for trace-pintool: {lib}')
             return []
 
         logfile = Path('pin.log')
         cmd = f'{exe} -t {lib} -o {logfile} -- {target.absolute()}'
-        args = cmd.split()
+        args = cmd.split() + target_args
         p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, err = p.communicate()
         return_code = p.returncode
@@ -91,15 +91,14 @@ class Pin:
 
         # Pin tool exits 1 on success ¯\_(ツ)_/¯
         if return_code != 1:
-            log.warn(f'Error {return_code} running pin with command: "{cmd}"')
+            log.warn(f'Got {return_code} running pin with command: "{cmd}"')
             log.warn(f'Echoing stderr:')
             log.warn(err.decode())
             log.warn(f'Echoing stdout:')
             log.warn(output.decode())
-            return []
         
         if not logfile.is_file():
-            log.warn(f'Something went wrong logging to {logfile}.')
+            log.error(f'Something went wrong logging to {logfile}.')
             return []
         
         return parse_pinlog(logfile)
@@ -116,8 +115,9 @@ def log_code(locations):
 
 def main():
     pin = Pin(args.pin_root)
-    target = Path(args.target)
-    dynamic_locations = pin.run(target)
+    target = Path(args.target[0])
+    target_args = args.target[1:]
+    dynamic_locations = pin.run(target, target_args)
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
         log.debug(l)
