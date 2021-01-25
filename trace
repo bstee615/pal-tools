@@ -1,0 +1,4 @@
+#!/bin/python3
+
+from tools.trace.trace import main
+main()
