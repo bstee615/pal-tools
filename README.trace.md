@@ -3,6 +3,10 @@
 This tool is a wrapper around `trace-pintool`, a tool using Intel Pin framework to generate a dynamic trace of a program's execution.
 This wrapper supplements `trace-pintool` with information which is only available statically, such as variable declarations without assignments and case statements.
 
+# Run
+
+Run with `trace <args>`. See `trace -h` for info.
+
 # Setup
 
 TL;DR: run `tools/trace/install.sh` in directory `tools/trace` and install libraries listed under **Extra Requirements**.
