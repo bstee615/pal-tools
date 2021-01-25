@@ -7,7 +7,7 @@ then
     # Download and unzip Pin
     echo Downloading and unpacking from $pin_url...
     wget -qO- $pin_url | tar --transform "s/^pin-3.16-98275-ge0db48c31-gcc-linux/$rename_to/" -xvz
-    test -d $rename_to || (echo FAIL && exit 1)
+    test -d $rename_to || (echo Could not download Pin from $pin_url to $rename_to. && exit 1)
     # Delete all tools except the support necessary for trace-pintool
     ls -d $tools/* | grep -v -e trace-pintool -e Config -e Utils -e makefile | xargs rm -r
 else
@@ -21,11 +21,12 @@ then
     echo Cloning pintool repo at $trace_tool...
     trace_url='https://github.com/bstee615/trace-pintool'
     git clone $trace_url $trace_tool
+    test -d $trace_tool || (echo Could not clone trace-pintool from $trace_url to $trace_tool. && exit 1)
 else
     echo Pintool already exists at $trace_tool.
 fi
 
 # Make trace-pintool
 pushd $trace_tool
-make
+make || (echo Could not build Pin. Please cd to $trace_tool and run make. && exit 1)
 popd
