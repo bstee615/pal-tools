@@ -45,7 +45,7 @@ def parse_pinlog(logfile):
     for line in loglines:
         split_index = line.rindex(':')
         filepath = line[:split_index]
-        lineno = line[split_index+1:]
+        lineno = int(line[split_index+1:])
         locations.append(Location(filepath, lineno))
     return locations
 
