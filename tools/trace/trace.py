@@ -136,7 +136,12 @@ def main():
         static_locations += locations
 
     # Output trace locations to file
-    all_locations = set(dynamic_locations + static_locations)
+    unique_dynamic_locations = set(dynamic_locations)
+    unique_static_locations = set(static_locations)
+    all_locations = unique_dynamic_locations.union(unique_static_locations)
+    log.debug(f'Removed {len(dynamic_locations) - len(unique_dynamic_locations)} duplicate dynamic locations')
+    log.debug(f'Removed {len(static_locations) - len(unique_static_locations)} duplicate static locations')
+    log.debug(f'Added {len(all_locations) - len(unique_dynamic_locations)} static locations to {len(unique_dynamic_locations)} dynamic locations totaling {len(all_locations)}')
     if args.output_file:
         output_stream = open(args.output_file, 'w')
     else:
