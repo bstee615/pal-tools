@@ -8,12 +8,14 @@ from clang.cindex import CursorKind
 from pathlib import Path
 import subprocess
 from collections import namedtuple
+import itertools
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
-    parser.add_argument('-p', '--pin-root', help='Use an alternative path to Pin root.', default='pin-3.16')
+    parser.add_argument('-p', '--pin-root', type=str, help='Use an alternative path to Pin root.', default='pin-3.16')
+    parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
     arguments = parser.parse_args()
     
     if arguments.log_level:
@@ -94,15 +96,31 @@ class Pin:
 def main():
     pin = Pin(args.pin_root)
     target = Path('test')
-    logs = pin.run(target)
-    log.debug(f'{len(logs)} logs')
-    for l in logs:
+    dynamic_locations = pin.run(target)
+    log.debug(f'{len(dynamic_locations)} logs')
+    for l in dynamic_locations:
         log.debug(l)
 
-    root = nodeutils.parse('test.c')
-    vd = nodeutils.find(root, CursorKind.VAR_DECL) + nodeutils.find(root, CursorKind.CASE_STMT) + nodeutils.find(root, CursorKind.DEFAULT_STMT)
-    for v in vd:
-        log.debug(nodeutils.pp(v))
+    static_locations = []
+    logged_filenames = set(l.filepath for l in dynamic_locations)
+    for f in logged_filenames:
+        log.debug(f'Parsing source file {f}')
+        root = nodeutils.parse(f)
+        kinds = [CursorKind.VAR_DECL, CursorKind.CASE_STMT, CursorKind.DEFAULT_STMT]
+        nodes = list(itertools.chain.from_iterable(nodeutils.find(root, k) for k in kinds))
+        locations = [Location(n.location.file.name, n.location.line) for n in nodes]
+        log.debug(f'{len(locations)} locations for source file {f}')
+        for l in locations:
+            log.debug(l)
+        static_locations += locations
+
+    if args.output_file:
+        with open(args.output_file) as f:
+            for l in dynamic_locations + static_locations:
+                f.write(f'{l.filepath}:{l.lineno}\n')
+    else:
+        for l in dynamic_locations + static_locations:
+            print(f'{l.filepath}:{l.lineno}')
 
 if __name__ == '__main__':
     main()
