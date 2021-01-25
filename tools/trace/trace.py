@@ -9,9 +9,11 @@ from pathlib import Path
 import subprocess
 from collections import namedtuple
 import itertools
+import sys
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('target', help='Target executable to trace. Must contain debug info (compiled with -g -O0).')
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-p', '--pin-root', type=str, help='Use an alternative path to Pin root.', default='pin-3.16')
@@ -96,7 +98,7 @@ class Pin:
 
 def main():
     pin = Pin(args.pin_root)
-    target = Path('test')
+    target = Path(args.target)
     dynamic_locations = pin.run(target)
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
@@ -115,13 +117,17 @@ def main():
             log.debug(l)
         static_locations += locations
 
+    all_locations = set(dynamic_locations + static_locations)
+
     if args.output_file:
-        with open(args.output_file) as f:
-            for l in dynamic_locations + static_locations:
-                f.write(f'{l.filepath}:{l.lineno}\n')
+        output_stream = open(args.output_file, 'w')
     else:
-        for l in dynamic_locations + static_locations:
-            print(f'{l.filepath}:{l.lineno}')
+        output_stream = sys.stdout
+    for l in all_locations:
+        output_stream.write(f'{l.filepath}:{l.lineno}\n')
+    
+    if output_stream is not sys.stdout:
+        output_stream.close()
 
 if __name__ == '__main__':
     main()
