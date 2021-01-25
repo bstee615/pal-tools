@@ -7,7 +7,7 @@ import nodeutils
 from clang.cindex import CursorKind
 from pathlib import Path
 import subprocess
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 import itertools
 import sys
 
@@ -96,6 +96,16 @@ class Pin:
         
         return parse_pinlog(logfile)
 
+def log_code(locations):
+    locations_by_filename = defaultdict(list)
+    for l in locations:
+        locations_by_filename[l.filepath].append(l.lineno)
+    for filepath, linenos in locations_by_filename.items():
+        log.debug(filepath)
+        filelines = Path(filepath).read_text().splitlines()
+        for l in sorted(linenos):
+            log.debug(f'{l:4} {filelines[l-1]}')
+
 def main():
     pin = Pin(args.pin_root)
     target = Path(args.target)
@@ -117,17 +127,18 @@ def main():
             log.debug(l)
         static_locations += locations
 
+    # Output trace locations to file
     all_locations = set(dynamic_locations + static_locations)
-
     if args.output_file:
         output_stream = open(args.output_file, 'w')
     else:
         output_stream = sys.stdout
     for l in all_locations:
         output_stream.write(f'{l.filepath}:{l.lineno}\n')
-    
     if output_stream is not sys.stdout:
         output_stream.close()
+
+    log_code(all_locations)
 
 if __name__ == '__main__':
     main()
