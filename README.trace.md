@@ -5,7 +5,7 @@ This wrapper supplements `trace-pintool` with information which is only availabl
 
 # Setup
 
-TL;DR: run `tools/trace/install.sh` and install libraries listed under **Extra Requirements**.
+TL;DR: run `tools/trace/install.sh` in directory `tools/trace` and install libraries listed under **Extra Requirements**.
 
 ## Extra Requirements
 Some extra requirements are needed.
@@ -18,4 +18,4 @@ pip3 install libclang pathlib # Install Python packages
 Pin must be installed under `tools/trace`, or an alternative location for a Pin installation can be specified with `-p`.
 Pin is distributed [here](http://software.intel.com/sites/landingpage/pintool/downloads/pin-3.16-98275-ge0db48c31-gcc-linux.tar.gz).
 `trace-pintool` is distributed [here](https://github.com/bstee615/trace-pintool). It must be unpacked into `<pin-root>/source/tools` and built.
-`tools/trace/install.sh` automates this process. Please make sure you are set up to build Pin.
+`tools/trace/install.sh` automates this process in the current working directory. Please run in `tools/trace` and before you run, make sure you are set up to build Pin.
