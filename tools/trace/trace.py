@@ -12,11 +12,14 @@ import itertools
 import sys
 
 def parse_args():
+    file_dir = Path(__file__).parent
+    default_pinroot = str(file_dir / 'pin-3.16')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('target', help='Target executable to trace. Must contain debug info (compiled with -g -O0).')
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
-    parser.add_argument('-p', '--pin-root', type=str, help='Use an alternative path to Pin root.', default='pin-3.16')
+    parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
     arguments = parser.parse_args()
     
@@ -28,7 +31,12 @@ def parse_args():
         verbose = True
         log.debug(f'verbose logging enabled')
 
-    arguments.pin_root = Path(__file__).parent / arguments.pin_root
+    if arguments.pin_root:
+        arguments.pin_root = Path.cwd() / arguments.pin_root
+
+    if not arguments.pin_root.is_dir():
+        log.warn(f'{arguments.pin_root} is not a valid Pin installation. See {file_dir}/install.sh for the recommended method for installing Pin.')
+        exit(1)
 
     return arguments
 
