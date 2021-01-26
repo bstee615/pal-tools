@@ -17,24 +17,34 @@ def get_node(file, function_name):
     assert node.kind == cindex.CursorKind.FUNCTION_DECL
     return node
 
+
+def smorg_lines():
+    filename = 'data/tests/smorg.c'
+    smorg = get_node(filename, 'smorgasboard')
+
+    smorg_loc = Location(smorg.location.file.name, smorg.location.line, smorg.location.column)
+    static_locations = get_static_locations([smorg_loc])
+
+    debug_code = debug_print_code(static_locations)
+    _, lines = zip(*debug_code[filename])
+    return lines
+
 class TestStaticInfo(unittest.TestCase):
 
-    def test_gets_static_info(self):
-        filename = 'data/tests/smorg.c'
-        smorg = get_node(filename, 'smorgasboard')
-
-        smorg_loc = Location(smorg.location.file.name, smorg.location.line, smorg.location.column)
-        static_locations = get_static_locations([smorg_loc])
-
-        debug_code = debug_print_code(static_locations)
-        _, lines = zip(*debug_code[filename])
-        print(lines)
+    def test_gets_vardecls(self):
+        lines = smorg_lines()
         assert any('int a' in l for l in lines)
         assert any('int b' in l for l in lines)
         assert any('int c' in l for l in lines)
+
+    def test_gets_cases(self):
+        lines = smorg_lines()
         assert any('case 0' in l for l in lines)
         assert any('case 1' in l for l in lines)
         assert any('case 253' in l for l in lines)
+
+    def test_gets_defaults(self):
+        lines = smorg_lines()
         assert any('default' in l for l in lines)
 
     def test_gets_static_info_only_from_target_function(self):
@@ -46,9 +56,10 @@ class TestStaticInfo(unittest.TestCase):
 
         debug_code = debug_print_code(static_locations)
         _, lines = zip(*debug_code[filename])
-        print(lines)
-        assert any('boo_var' in l for _, l in lines)
-        assert not any('foo_var' in l for _, l in lines)
+        assert any('boo_var' in l for l in lines)
+        assert any('// boo' in l for l in lines)
+        assert not any('foo_var' in l for l in lines)
+        assert not any('// foo' in l for l in lines)
 
 
 if __name__ == '__main__':
