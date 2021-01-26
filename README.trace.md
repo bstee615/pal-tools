@@ -13,17 +13,48 @@ This example invokes `trace` to trace execution of an example program `data/test
 
 ```
 [me@centos8 pal-tools]$ gcc -g -O0 data/test.c -odata/test
+[me@centos8 pal-tools]$ cat data/test.c
+int main(int argc, char **argv)
+{
+    int a = 0;
+    switch (argc) {
+        case 1:
+        case 2:
+        a = argc;
+        break;
+        default:
+        a = -1;
+        break;
+    }
+    return a;
+}
 [me@centos8 pal-tools]$ ./trace -- data/test
-/home/me/work/pal-tools/data/test.c:7
+/home/me/work/pal-tools/data/test.c:9
 /home/me/work/pal-tools/data/test.c:4
 /home/me/work/pal-tools/data/test.c:5
-/home/me/work/pal-tools/data/test.c:8
-/home/me/work/pal-tools/data/test.c:2
-/home/me/work/pal-tools/data/test.c:9
-/home/me/work/pal-tools/data/test.c:3
-/home/me/work/pal-tools/data/test.c:14
 /home/me/work/pal-tools/data/test.c:6
+/home/me/work/pal-tools/data/test.c:7
 /home/me/work/pal-tools/data/test.c:13
+/home/me/work/pal-tools/data/test.c:14
+/home/me/work/pal-tools/data/test.c:2
+/home/me/work/pal-tools/data/test.c:8
+/home/me/work/pal-tools/data/test.c:3
+```
+
+Here is a debug trace showing which lines are in the final trace. If you want this kind of trace, you can use `trace -lDEBUG -- data/test` and it will be printed at the end.
+
+```
+DEBUG - /home/me/work/pal-tools/data/test.c
+DEBUG -    2 {
+DEBUG -    3     int a = 0;
+DEBUG -    4     switch (argc) {
+DEBUG -    5         case 1:
+DEBUG -    6         case 2:
+DEBUG -    7         a = argc;
+DEBUG -    8         break;
+DEBUG -    9         default:
+DEBUG -   13     return a;
+DEBUG -   14 }
 ```
 
 # Setup
