@@ -89,7 +89,8 @@ class Pin:
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         stdout, _ = p.communicate()
         return_code = p.returncode
-        log.debug(f'Ran "{cmd}" with return code {return_code}')
+        args_str = ' '.join(args)
+        log.debug(f'Ran "{args_str}" with return code {return_code}')
 
         # Pin tool exits 1 on success ¯\_(ツ)_/¯
         log.info(f'Got return code {return_code} running pin with command: "{cmd}"')

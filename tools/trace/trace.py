@@ -51,6 +51,8 @@ def parse_args(argv=sys.argv, do_wizard=True):
     else:
         arguments.pin = Pin(arguments.pin_root)
 
+    log.debug(f'arguments: {arguments}')
+
     return arguments
 
 def debug_print_code(locations):
