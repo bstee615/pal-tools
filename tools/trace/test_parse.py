@@ -29,7 +29,6 @@ class TestStaticInfo(unittest.TestCase):
         debug_code = debug_print_code(static_locations)
         _, lines = zip(*debug_code[filename])
         print(lines)
-        assert len(lines) == 7
         assert any('int a' in l for l in lines)
         assert any('int b' in l for l in lines)
         assert any('int c' in l for l in lines)
@@ -48,7 +47,6 @@ class TestStaticInfo(unittest.TestCase):
         debug_code = debug_print_code(static_locations)
         _, lines = zip(*debug_code[filename])
         print(lines)
-        assert len(lines) == 1
         assert any('boo_var' in l for _, l in lines)
         assert not any('foo_var' in l for _, l in lines)
 
