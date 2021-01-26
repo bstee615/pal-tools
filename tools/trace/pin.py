@@ -12,10 +12,11 @@ def parse_pinlog(logfile):
     loglines = logtext.splitlines()
     locations = []
     for line in loglines:
-        split_index = line.rindex(':')
-        filepath = line[:split_index]
-        lineno = int(line[split_index+1:])
-        locations.append(Location(filepath, lineno))
+        split = line.split(':')
+        filepath = split[0]
+        lineno = int(split[1])
+        column = int(split[2])
+        locations.append(Location(filepath, lineno, column))
     return locations
 
 
@@ -70,7 +71,7 @@ class Pin:
     def run(self, target, target_args):
         """
         Run Pin. Collect results in temporary file pin.log
-        and return a list of trace locations (filepath:lineno).
+        and return a list of trace locations (filepath:lineno:column).
         """
         if not target.is_file():
             log.error(f'No such file for target executable: {target}')
@@ -84,7 +85,7 @@ class Pin:
             return []
 
         logfile = Path('pin.log')
-        cmd = f'{self.exe} -t {self.lib} -o {logfile} -- {target.absolute()}'
+        cmd = f'{self.exe} -t {self.lib} -o {logfile} -c -- {target.absolute()}'
         args = cmd.split() + target_args
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         stdout, _ = p.communicate()
