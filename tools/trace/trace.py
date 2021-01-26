@@ -62,10 +62,10 @@ def debug_print_code(locations):
     for l in locations:
         locations_by_filename[l.filepath].append(l.lineno)
     for filepath, linenos in locations_by_filename.items():
-        log.debug(filepath)
+        yield '', filepath
         filelines = Path(filepath).read_text().splitlines()
         for l in sorted(linenos):
-            log.debug(f'{l:4} {filelines[l-1]}')
+            yield l, filelines[l-1]
 
 def main():
     global args
@@ -96,7 +96,8 @@ def main():
     if output_stream is not sys.stdout:
         output_stream.close()
 
-    debug_print_code(slim_locations)
+    for line, content in debug_print_code(slim_locations):
+        log.debug(f'{line:4} {content}')
 
 def get_static_locations(dynamic_locations):
     """
