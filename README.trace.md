@@ -5,7 +5,7 @@ This wrapper supplements `trace-pintool` with information which is only availabl
 
 # Run
 
-Run with `trace <args>`. See `trace -h` for info.
+Trace a command with `trace -- <command>`. See `trace -h` for info.
 
 # Example Usage
 
@@ -13,7 +13,7 @@ This example invokes `trace` to trace execution of an example program `data/test
 
 ```
 [me@centos8 pal-tools]$ gcc -g -O0 data/test.c -odata/test
-[me@centos8 pal-tools]$ ./trace data/test
+[me@centos8 pal-tools]$ ./trace -- data/test
 /home/me/work/pal-tools/data/test.c:7
 /home/me/work/pal-tools/data/test.c:4
 /home/me/work/pal-tools/data/test.c:5
