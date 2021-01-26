@@ -25,10 +25,11 @@ class TestStaticInfo(unittest.TestCase):
 
         smorg_loc = Location(smorg.location.file.name, smorg.location.line, smorg.location.column)
         static_locations = get_static_locations([smorg_loc])
-        assert len(static_locations) == 7
 
         debug_code = debug_print_code(static_locations)
         _, lines = zip(*debug_code[filename])
+        print(lines)
+        assert len(lines) == 7
         assert any('int a' in l for l in lines)
         assert any('int b' in l for l in lines)
         assert any('int c' in l for l in lines)
@@ -43,11 +44,13 @@ class TestStaticInfo(unittest.TestCase):
 
         boo_loc = Location(boo.location.file.name, boo.location.line, boo.location.column)
         static_locations = get_static_locations([boo_loc])
-        assert len(static_locations) == 1
 
         debug_code = debug_print_code(static_locations)
-        assert any('boo_var' in line for _, line in debug_code[filename])
-        assert not any('foo_var' in line for _, line in debug_code[filename])
+        _, lines = zip(*debug_code[filename])
+        print(lines)
+        assert len(lines) == 1
+        assert any('boo_var' in l for _, l in lines)
+        assert not any('foo_var' in l for _, l in lines)
 
 
 if __name__ == '__main__':
