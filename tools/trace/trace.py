@@ -4,7 +4,7 @@ from mylog import log
 import argparse
 import logging
 import nodeutils
-from clang.cindex import CursorKind
+from clang.cindex import Cursor, CursorKind, File, SourceLocation
 from pathlib import Path
 from collections import defaultdict
 import sys
@@ -78,18 +78,7 @@ def main():
     for l in dynamic_locations:
         log.debug(l)
 
-    static_locations = []
-    logged_filenames = set(l.filepath for l in dynamic_locations)
-    for f in logged_filenames:
-        log.debug(f'Parsing source file {f}')
-        root = nodeutils.parse(f)
-        kinds = [CursorKind.VAR_DECL, CursorKind.CASE_STMT, CursorKind.DEFAULT_STMT]
-        nodes = list(itertools.chain.from_iterable(nodeutils.find(root, k) for k in kinds))
-        locations = [Location(n.location.file.name, n.location.line) for n in nodes]
-        log.debug(f'{len(locations)} locations for source file {f}')
-        for l in locations:
-            log.debug(l)
-        static_locations += locations
+    static_locations = get_static_locations(dynamic_locations)
 
     # Output trace locations to file
     all_locations = dynamic_locations + static_locations
@@ -108,6 +97,64 @@ def main():
         output_stream.close()
 
     debug_print_code(slim_locations)
+
+def get_static_locations(dynamic_locations):
+    """
+    Get locations for certain constructs which are only available statically.
+    - Variable declarations without any executable code "int i;"
+    - Case statements "case foo:"
+    - Default statements "default: "
+    """
+    static_locations = []
+    def ancestor_node(n):
+        """
+        Get the nearest significant ancestor.
+        """
+        if n.kind == CursorKind.FUNCTION_DECL:
+            return n
+        else:
+            if n.semantic_parent is None:
+                return n
+            else:
+                return ancestor_node(n.semantic_parent)
+    
+    def good(n):
+        """
+        Node should be added to the trace.
+        """
+        if n.kind in (CursorKind.VAR_DECL, CursorKind.CASE_STMT, CursorKind.DEFAULT_STMT):
+            return True
+        else:
+            return False
+
+    filepaths = defaultdict(list)
+    for l in dynamic_locations:
+        filepaths[l.filepath].append(l)
+    for filepath, locations in filepaths.items():
+        log.debug(f'Parsing source file {filepath}')
+        root = nodeutils.parse(filepath)
+        ancestors = []
+        file = File.from_name(root.translation_unit, filepath)
+        for l in locations:
+            source_location = SourceLocation.from_position(root.translation_unit, file, l.lineno, l.column)
+            node = Cursor.from_location(root.translation_unit, source_location)
+            if node.kind.is_invalid():
+                continue
+            ancestor = ancestor_node(node)
+            if ancestor not in ancestors:
+                log.debug(f'node {nodeutils.pp(node)} has ancestor {nodeutils.pp(ancestor)}')
+                ancestors.append(ancestor)
+        for a in ancestors:
+            if a.kind.is_translation_unit():
+                continue # Do not include global constructs
+            else:
+                nodes = nodeutils.find(a, good)
+                locations = [Location(n.location.file.name, n.location.line, n.location.column) for n in nodes]
+                for l in locations:
+                    log.debug(l)
+                static_locations += locations
+
+    return static_locations
 
 if __name__ == '__main__':
     main()
