@@ -1,6 +1,5 @@
 import unittest
 from tools.trace.trace import parse_args
-import argparse
 
 arg_sets = [
     (["trace", "--", "data/coreutils.7eff5901/coreutils-assert/src/expr", "2", "+", "-4"], ["data/coreutils.7eff5901/coreutils-assert/src/expr", "2", "+", "-4"],),
