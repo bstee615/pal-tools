@@ -7,6 +7,25 @@ This wrapper supplements `trace-pintool` with information which is only availabl
 
 Run with `trace <args>`. See `trace -h` for info.
 
+# Example Usage
+
+This example invokes `trace` to trace execution of an example program `data/test`.
+
+```
+[me@centos8 pal-tools]$ gcc -g -O0 data/test.c -odata/test
+[me@centos8 pal-tools]$ ./trace data/test
+/home/me/work/pal-tools/data/test.c:7
+/home/me/work/pal-tools/data/test.c:4
+/home/me/work/pal-tools/data/test.c:5
+/home/me/work/pal-tools/data/test.c:8
+/home/me/work/pal-tools/data/test.c:2
+/home/me/work/pal-tools/data/test.c:9
+/home/me/work/pal-tools/data/test.c:3
+/home/me/work/pal-tools/data/test.c:14
+/home/me/work/pal-tools/data/test.c:6
+/home/me/work/pal-tools/data/test.c:13
+```
+
 # Setup
 
 TL;DR: run `tools/trace/install.sh` in directory `tools/trace` and install libraries listed under **Extra Requirements**.
