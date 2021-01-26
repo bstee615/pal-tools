@@ -76,7 +76,11 @@ def main():
 
     target = Path(args.target[0])
     target_args = args.target[1:]
-    dynamic_locations = args.pin.run(target, target_args)
+    try:
+        dynamic_locations = args.pin.run(target, target_args)
+    except Exception as e:
+        log.error(e)
+        return -1
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
         log.debug(l)
@@ -96,11 +100,12 @@ def main():
     if output_stream is not sys.stdout:
         output_stream.close()
 
-    debug_info = debug_print_code(all_locations)
+    debug_info = debug_print_code(slim_locations)
     for filepath, content in debug_info.items():
         log.debug(filepath)
         for lineno, text in content:
             log.debug(f'{lineno:4} {text}')
+    return 0
 
 def get_static_locations(dynamic_locations):
     """
@@ -161,5 +166,5 @@ def get_static_locations(dynamic_locations):
     return static_locations
 
 if __name__ == '__main__':
-    main()
+    exit(main())
 
