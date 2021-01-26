@@ -58,14 +58,17 @@ def debug_print_code(locations):
     """
     Print the source lines from a list of locations on the debug stream.
     """
-    locations_by_filename = defaultdict(list)
+    linenos_by_filepath = defaultdict(list)
+    linetext_by_filepath = defaultdict(list)
     for l in locations:
-        locations_by_filename[l.filepath].append(l.lineno)
-    for filepath, linenos in locations_by_filename.items():
-        yield '', filepath
+        linenos_by_filepath[l.filepath].append(l.lineno)
+    for f in linenos_by_filepath:
+        linenos_by_filepath[f] = sorted(linenos_by_filepath[f])
+    for filepath, linenos in linenos_by_filepath.items():
         filelines = Path(filepath).read_text().splitlines()
         for l in sorted(linenos):
-            yield l, filelines[l-1]
+            linetext_by_filepath[filepath].append(filelines[l-1])
+    return {fp:list(zip(linenos_by_filepath[fp], linetext_by_filepath[fp])) for fp in linenos_by_filepath}
 
 def main():
     global args
@@ -82,9 +85,6 @@ def main():
 
     # Output trace locations to file
     all_locations = dynamic_locations + static_locations
-    # log.debug(f'Removed {len(dynamic_locations) - len(unique_dynamic_locations)} duplicate dynamic locations')
-    # log.debug(f'Removed {len(static_locations) - len(unique_static_locations)} duplicate static locations')
-    # log.debug(f'Added {len(all_locations) - len(unique_dynamic_locations)} static locations to {len(unique_dynamic_locations)} dynamic locations totaling {len(all_locations)}')
     slim_locations = set(SlimLocation(l.filepath, l.lineno) for l in all_locations)
     
     if args.output_file:
@@ -96,8 +96,11 @@ def main():
     if output_stream is not sys.stdout:
         output_stream.close()
 
-    for line, content in debug_print_code(slim_locations):
-        log.debug(f'{line:4} {content}')
+    debug_info = debug_print_code(all_locations)
+    for filepath, content in debug_info.items():
+        log.debug(filepath)
+        for lineno, text in content:
+            log.debug(f'{lineno:4} {text}')
 
 def get_static_locations(dynamic_locations):
     """
