@@ -85,22 +85,36 @@ class Pin:
             return []
 
         logfile = Path('pin.log')
-        cmd = f'{self.exe} -t {self.lib} -o {logfile} -c -- {target.absolute()}'
-        args = cmd.split() + target_args
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        stdout, _ = p.communicate()
-        return_code = p.returncode
-        args_str = ' '.join(args)
-        log.debug(f'Ran "{args_str}" with return code {return_code}')
+        errorfile = Path('error.log')
+        try:
+            # Clear files if present from old executions
+            if logfile.is_file():
+                logfile.unlink()
+            if errorfile.is_file():
+                errorfile.unlink()
 
-        # Pin tool exits 1 on success ¯\_(ツ)_/¯
-        log.info(f'Got return code {return_code} running pin with command: "{cmd}"')
-        log.info(f'Echoing output stream:')
-        for l in stdout.decode().splitlines():
-            log.info(f'**[{target.name}]** {l}')
-        
-        if not logfile.is_file():
-            log.error(f'Something went wrong logging to {logfile}.')
-            return []
-        
-        return parse_pinlog(logfile)
+            # Run Pin
+            cmd = f'{self.exe} -error_file {errorfile.absolute()} -t {self.lib} -o {logfile} -c -- {target.absolute()}'
+            args = cmd.split() + target_args
+            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            stdout, _ = p.communicate()
+            return_code = p.returncode
+            args_str = ' '.join(args)
+
+            # Pin tool exits 1 on success ¯\_(ツ)_/¯ use errorfile to detect errors
+            log.info(f'Got return code {return_code} running pin with command: "{args_str}"')
+            if errorfile.is_file():
+                log.warn(f'Echoing Pin output stream:')
+                for l in stdout.decode().splitlines():
+                    log.warn(f'* {l}')
+                errorfile.unlink()
+                raise Exception(f'Pin had an error while running. See {errorfile} for more information.')
+            if errorfile.is_file():
+                errorfile.unlink()
+
+            if not logfile.is_file():
+                raise Exception(f'Something went wrong running Pin -- {logfile} is missing.')
+            return parse_pinlog(logfile)
+        finally:
+            if logfile.is_file():
+                logfile.unlink()
