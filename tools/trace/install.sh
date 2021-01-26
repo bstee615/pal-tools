@@ -36,7 +36,6 @@ then
         echo echo Could not clone trace-pintool from $trace_url to $trace_tool.
         exit 1
     fi
-    rm -rf "$trace_tool/.git"
 else
     echo Pintool already exists at $trace_tool.
 fi
