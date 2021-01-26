@@ -6,24 +6,34 @@ import logging
 import nodeutils
 from clang.cindex import CursorKind
 from pathlib import Path
-import subprocess
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import itertools
 import sys
 from .pin import Pin
 from .location import Location
 
-def parse_args():
+def parse_args(argv=sys.argv, do_wizard=True):
     file_dir = Path(__file__).parent
     default_pinroot = str(file_dir / 'pin-3.16')
+
+    if '--' in argv:
+        after_dash = argv[argv.index('--')+1:]
+        argv = argv[:argv.index('--')]
+    else:
+        after_dash = None
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)', default='WARN')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
-    parser.add_argument('target', help='Target command to trace. Must contain debug info (compiled with -g -O0).', nargs='*')
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv[1:])
+    
+    if after_dash is None:
+        raise argparse.ArgumentTypeError('A delimiter -- before the command is required')
+
+    # arguments.target = arguments.target.split()
+    arguments.target = after_dash
     
     if arguments.log_level:
         log.setLevel(logging.getLevelName(arguments.log_level))
@@ -36,12 +46,12 @@ def parse_args():
     if arguments.pin_root:
         arguments.pin_root = Path.cwd() / arguments.pin_root
 
-    arguments.pin = Pin.do_wizard(arguments.pin_root, file_dir / 'install.sh')
+    if do_wizard:
+        arguments.pin = Pin.do_wizard(arguments.pin_root, file_dir / 'install.sh')
+    else:
+        arguments.pin = Pin(arguments.pin_root)
 
     return arguments
-
-args = parse_args()
-verbose=False
 
 def debug_print_code(locations):
     """
@@ -57,6 +67,9 @@ def debug_print_code(locations):
             log.debug(f'{l:4} {filelines[l-1]}')
 
 def main():
+    global args
+    args = parse_args()
+
     target = Path(args.target[0])
     target_args = args.target[1:]
     dynamic_locations = args.pin.run(target, target_args)
