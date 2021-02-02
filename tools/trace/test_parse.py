@@ -84,9 +84,36 @@ class TestStaticInfo(unittest.TestCase):
         fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
         static_locations = get_static_locations([fn_loc], [f'-I{get_testpath("tests/hidden")}'])
         debug_code = debug_print_code(static_locations)
-        assert len(debug_code) > 0
+        assert len(debug_code) == 1
+        assert len(debug_code[filename]) == 1
         _, lines = zip(*debug_code[filename])
         assert any('mytype i;' in l for l in lines)
+
+    def test_hidden_includes_multiple(self):
+        filename = get_testpath('tests/includeme2.c')
+        fn = get_node(filename, 'main')
+
+        fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
+        static_locations = get_static_locations([fn_loc], [])
+        debug_code = debug_print_code(static_locations)
+        assert len(debug_code) == 0
+        
+        fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
+        static_locations = get_static_locations([fn_loc], [f'-I{get_testpath("tests/hidden")}'])
+        debug_code = debug_print_code(static_locations)
+        assert len(debug_code) == 1
+        assert len(debug_code[filename]) == 1
+        _, lines = zip(*debug_code[filename])
+        assert any('mytype i;' in l for l in lines)
+        
+        fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
+        static_locations = get_static_locations([fn_loc], [f'-I{get_testpath("tests/hidden")}', f'-I{get_testpath("tests/hidden2")}'])
+        debug_code = debug_print_code(static_locations)
+        assert len(debug_code) == 1
+        assert len(debug_code[filename]) == 2
+        _, lines = zip(*debug_code[filename])
+        assert any('mytype i;' in l for l in lines)
+        assert any('mytype2 j;' in l for l in lines)
 
 
 if __name__ == '__main__':
