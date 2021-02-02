@@ -3,6 +3,7 @@ from tools.trace.location import Location
 from tools.trace.trace import debug_print_code, get_static_locations
 import unittest
 import nodeutils
+from pathlib import Path
 
 from clang import cindex
 
@@ -18,8 +19,18 @@ def get_node(file, function_name):
     return node
 
 
+def get_testpath(filepath):
+    """
+    Validate and return the path to a test file or directory
+    """
+    root = Path(__file__).resolve().parent
+    testfile = root / filepath
+    assert testfile.is_file() or testfile.is_dir()
+    return str(testfile)
+
+
 def smorg_lines():
-    filename = 'data/tests/smorg.c'
+    filename = get_testpath('tests/smorg.c')
     smorg = get_node(filename, 'smorgasboard')
 
     smorg_loc = Location(smorg.location.file.name, smorg.location.line, smorg.location.column)
@@ -48,7 +59,7 @@ class TestStaticInfo(unittest.TestCase):
         assert any('default' in l for l in lines)
 
     def test_gets_static_info_only_from_target_function(self):
-        filename = 'data/tests/picky.c'
+        filename = get_testpath('tests/picky.c')
         boo = get_node(filename, 'boo')
 
         boo_loc = Location(boo.location.file.name, boo.location.line, boo.location.column)
