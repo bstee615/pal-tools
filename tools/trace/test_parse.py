@@ -7,9 +7,9 @@ from pathlib import Path
 
 from clang import cindex
 
-def get_node(file, function_name):
+def get_node(file, function_name, clang_args=[]):
     index = cindex.Index.create()
-    translation_unit = index.parse(file)
+    translation_unit = index.parse(file, args=clang_args)
     with open(file) as f:
         source_index = f.read().index(function_name)
     file = cindex.File.from_name(translation_unit, file)
@@ -34,7 +34,7 @@ def smorg_lines():
     smorg = get_node(filename, 'smorgasboard')
 
     smorg_loc = Location(smorg.location.file.name, smorg.location.line, smorg.location.column)
-    static_locations = get_static_locations([smorg_loc])
+    static_locations = get_static_locations([smorg_loc], [])
 
     debug_code = debug_print_code(static_locations)
     _, lines = zip(*debug_code[filename])
@@ -63,7 +63,7 @@ class TestStaticInfo(unittest.TestCase):
         boo = get_node(filename, 'boo')
 
         boo_loc = Location(boo.location.file.name, boo.location.line, boo.location.column)
-        static_locations = get_static_locations([boo_loc])
+        static_locations = get_static_locations([boo_loc], [])
 
         debug_code = debug_print_code(static_locations)
         _, lines = zip(*debug_code[filename])
@@ -71,6 +71,22 @@ class TestStaticInfo(unittest.TestCase):
         assert any('// boo' in l for l in lines)
         assert not any('foo_var' in l for l in lines)
         assert not any('// foo' in l for l in lines)
+
+    def test_hidden_includes(self):
+        filename = get_testpath('tests/includeme.c')
+        fn = get_node(filename, 'main')
+
+        fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
+        static_locations = get_static_locations([fn_loc], [])
+        debug_code = debug_print_code(static_locations)
+        assert len(debug_code) == 0
+        
+        fn_loc = Location(fn.location.file.name, fn.location.line, fn.location.column)
+        static_locations = get_static_locations([fn_loc], [f'-I{get_testpath("tests/hidden")}'])
+        debug_code = debug_print_code(static_locations)
+        assert len(debug_code) > 0
+        _, lines = zip(*debug_code[filename])
+        assert any('mytype i;' in l for l in lines)
 
 
 if __name__ == '__main__':
