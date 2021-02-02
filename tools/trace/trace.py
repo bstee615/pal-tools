@@ -26,6 +26,7 @@ def parse_args(argv=sys.argv, do_wizard=True):
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
+    parser.add_argument('-I', default=[], dest='clang_include_paths', action='append', help='Include paths to pass to Clang (same as clang\'s -I flag)')
     arguments = parser.parse_args(argv[1:])
     
     if after_dash is None:
@@ -83,9 +84,10 @@ def main():
         return -1
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
-        log.debug(l)
+        log.debug(f'dynamic location {l}')
 
-    static_locations = get_static_locations(dynamic_locations)
+    clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
+    static_locations = get_static_locations(dynamic_locations, clang_include_paths)
 
     # Output trace locations to file
     all_locations = dynamic_locations + static_locations
@@ -107,7 +109,7 @@ def main():
             log.debug(f'{lineno:4} {text}')
     return 0
 
-def get_static_locations(dynamic_locations):
+def get_static_locations(dynamic_locations, clang_include_paths):
     """
     Get locations for certain constructs which are only available statically.
     - Variable declarations without any executable code "int i;"
@@ -140,8 +142,8 @@ def get_static_locations(dynamic_locations):
     for l in dynamic_locations:
         filepaths[l.filepath].append(l)
     for filepath, locations in filepaths.items():
-        log.debug(f'Parsing source file {filepath}')
-        root = nodeutils.parse(filepath)
+        log.debug(f'Parsing source file {filepath} with args {clang_include_paths}')
+        root = nodeutils.parse(filepath, clang_include_paths)
         ancestors = []
         file = File.from_name(root.translation_unit, filepath)
         for l in locations:
@@ -160,7 +162,7 @@ def get_static_locations(dynamic_locations):
                 nodes = nodeutils.find(a, good)
                 locations = [Location(n.location.file.name, n.location.line, n.location.column) for n in nodes]
                 for l in locations:
-                    log.debug(l)
+                    log.debug(f'static location {l}')
                 static_locations += locations
 
     return static_locations
