@@ -21,10 +21,11 @@ def parse_pinlog(logfile):
 
 
 class Pin:
-    def __init__(self, pin_root):
+    def __init__(self, pin_root, keep_logfile):
         self.root = pin_root
         self.exe = self.root / 'pin'
         self.lib = self.root / 'source/tools/trace-pintool/obj-intel64/trace.so'
+        self.keep_logfile = keep_logfile
 
     def is_valid(self):
         """
@@ -33,12 +34,12 @@ class Pin:
         return all((self.root.is_dir(), self.exe.is_file(), self.lib.is_file()))
 
     @classmethod
-    def do_wizard(_, pin_root, install_sh):
+    def do_wizard(_, pin_root, install_sh, keep_logfile):
         """
         Get Pin installation from root.
         If Pin is not at the expected location, do the interactive wizard with install_sh.
         """
-        pin = Pin(pin_root)
+        pin = Pin(pin_root, keep_logfile)
         if not pin.is_valid():
             log.warn(f'{pin_root} is not a valid Pin installation.')
             if not install_sh.is_file():
@@ -62,7 +63,7 @@ class Pin:
                 else:
                     exit(1)
 
-        pin = Pin(pin_root)
+        pin = Pin(pin_root, keep_logfile)
         if not pin.is_valid():
             log.error(f'Something is wrong with the Pin environment at {pin_root}')
 
@@ -116,5 +117,5 @@ class Pin:
                 raise Exception(f'Something went wrong running Pin -- {logfile} is missing.')
             return parse_pinlog(logfile)
         finally:
-            if logfile.is_file():
+            if logfile.is_file() and not self.keep_logfile:
                 logfile.unlink()
