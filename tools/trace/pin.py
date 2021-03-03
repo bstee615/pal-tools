@@ -21,11 +21,11 @@ def parse_pinlog(logfile):
 
 
 class Pin:
-    def __init__(self, pin_root, keep_logfile):
-        self.root = pin_root
+    def __init__(self, args):
+        self.root = args.pin_root
         self.exe = self.root / 'pin'
         self.lib = self.root / 'source/tools/trace-pintool/obj-intel64/trace.so'
-        self.keep_logfile = keep_logfile
+        self.keep_logfile = args.keep_logfile
 
     def is_valid(self):
         """
@@ -34,24 +34,25 @@ class Pin:
         return all((self.root.is_dir(), self.exe.is_file(), self.lib.is_file()))
 
     @classmethod
-    def do_wizard(_, pin_root, install_sh, keep_logfile):
+    def do_wizard(_, args, install_sh):
         """
         Get Pin installation from root.
         If Pin is not at the expected location, do the interactive wizard with install_sh.
         """
-        pin = Pin(pin_root, keep_logfile)
+        root = args.pin_root
+        pin = Pin(args)
         if not pin.is_valid():
-            log.warn(f'{pin_root} is not a valid Pin installation.')
+            log.warn(f'{root} is not a valid Pin installation.')
             if not install_sh.is_file():
                 log.error(f'Could not execute {install_sh}.')
                 exit(1)
             else:
                 log.warn(f'See {install_sh} for the recommended method for installing Pin.')
-                yn = input(f'Should I install it at {pin_root}? [type y to install, anything else to quit]: ')
+                yn = input(f'Should I install it at {root}? [type y to install, anything else to quit]: ')
                 if yn == 'y':
-                    cmd = f'bash {install_sh.absolute()} {pin_root.name}'
-                    log.debug(f'Running Bash script install.sh with "{cmd}" in directory "{pin_root}"')
-                    proc = subprocess.Popen(cmd.split(), cwd=pin_root.parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    cmd = f'bash {install_sh.absolute()} {root.name}'
+                    log.debug(f'Running Bash script install.sh with "{cmd}" in directory "{root}"')
+                    proc = subprocess.Popen(cmd.split(), cwd=root.parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                     stdout, _ = proc.communicate()
                     for l in stdout.decode().splitlines():
                         log.info(f'**[{install_sh.name}]** {l}')
@@ -63,9 +64,9 @@ class Pin:
                 else:
                     exit(1)
 
-        pin = Pin(pin_root, keep_logfile)
+        pin = Pin(args)
         if not pin.is_valid():
-            log.error(f'Something is wrong with the Pin environment at {pin_root}')
+            log.error(f'Something is wrong with the Pin environment at {root}')
 
         return pin
     
