@@ -24,6 +24,7 @@ def parse_args(argv=sys.argv, do_wizard=True):
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)', default='WARN')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
+    parser.add_argument('-k', '--keep-logfile', action='store_true', help='Keep the log file after running Pin')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
     parser.add_argument('-I', default=[], dest='clang_include_paths', action='append', help='Include paths to pass to Clang (same as clang\'s -I flag)')
@@ -47,9 +48,9 @@ def parse_args(argv=sys.argv, do_wizard=True):
         arguments.pin_root = Path.cwd() / arguments.pin_root
 
     if do_wizard:
-        arguments.pin = Pin.do_wizard(arguments.pin_root, file_dir / 'install.sh')
+        arguments.pin = Pin.do_wizard(arguments.pin_root, file_dir / 'install.sh', arguments.keep_logfile)
     else:
-        arguments.pin = Pin(arguments.pin_root)
+        arguments.pin = Pin(arguments.pin_root, arguments.keep_logfile)
 
     log.debug(f'arguments: {arguments}')
 
