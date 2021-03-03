@@ -48,9 +48,9 @@ def parse_args(argv=sys.argv, do_wizard=True):
         arguments.pin_root = Path.cwd() / arguments.pin_root
 
     if do_wizard:
-        arguments.pin = Pin.do_wizard(arguments.pin_root, file_dir / 'install.sh', arguments.keep_logfile)
+        arguments.pin = Pin.do_wizard(arguments, file_dir / 'install.sh')
     else:
-        arguments.pin = Pin(arguments.pin_root, arguments.keep_logfile)
+        arguments.pin = Pin(arguments)
 
     log.debug(f'arguments: {arguments}')
 
