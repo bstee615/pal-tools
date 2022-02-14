@@ -10,6 +10,7 @@ from collections import defaultdict
 import sys
 from .pin import Pin
 from .location import Location, SlimLocation
+import traceback
 
 def parse_args(argv=sys.argv, do_wizard=True):
     file_dir = Path(__file__).parent
@@ -82,6 +83,7 @@ def main():
         dynamic_locations = args.pin.run(target, target_args)
     except Exception as e:
         log.error(e)
+        log.error(traceback.format_exc())
         return -1
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
