@@ -42,6 +42,7 @@ fi
 
 # Make trace-pintool
 pushd $trace_tool
+git checkout pal-tools
 make
 make_ret=$?
 popd
