@@ -4,7 +4,7 @@ from mylog import log
 import argparse
 import logging
 import nodeutils
-from clang.cindex import Cursor, CursorKind, File, SourceLocation
+from clang.cindex import TranslationUnitLoadError, Config, Cursor, CursorKind, File, SourceLocation
 from pathlib import Path
 from collections import defaultdict
 import sys
@@ -88,6 +88,10 @@ def main():
     log.debug(f'{len(dynamic_locations)} logs')
     for l in dynamic_locations:
         log.debug(f'dynamic location {l}')
+        if not Path(l.filepath).exists():
+            log.debug(f'^^^ file does not exist ^^^')
+    
+    dynamic_locations = [d for d in dynamic_locations if Path(d.filepath).exists()]
 
     clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
     static_locations = get_static_locations(dynamic_locations, clang_include_paths)
