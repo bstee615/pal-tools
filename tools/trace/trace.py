@@ -123,12 +123,13 @@ def main():
     dynamic_locations = [d for d in dynamic_locations if Path(d.filepath).exists()]
 
     static_locations = []
-    if args.include_static:
-        clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
-        static_locations = get_static_locations(dynamic_locations, clang_include_paths)
+    clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
+    static_locations = get_static_locations(dynamic_locations, clang_include_paths)
 
     # Store only filepath and lineno and dedup
-    all_locations = slim(dynamic_locations, args.include_code) + slim(static_locations, args.include_code)
+    all_locations = slim(dynamic_locations, args.include_code)
+    if args.include_static:
+        all_locations += slim(static_locations, args.include_code)
     
     # Output trace locations to file
     if args.output_file:
