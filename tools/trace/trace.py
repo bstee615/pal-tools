@@ -4,7 +4,7 @@ from mylog import log
 import argparse
 import logging
 import nodeutils
-from clang.cindex import TranslationUnitLoadError, Config, Cursor, CursorKind, File, SourceLocation
+from clang.cindex import Config, Cursor, CursorKind, File, SourceLocation
 from pathlib import Path
 from collections import defaultdict
 import sys
@@ -29,6 +29,7 @@ def parse_args(argv=sys.argv, do_wizard=True):
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
     parser.add_argument('-I', default=[], dest='clang_include_paths', action='append', help='Include paths to pass to Clang (same as clang\'s -I flag)')
+    parser.add_argument('--clang_library_file', type=str, help='Library file to load for Libclang stuff')
     arguments = parser.parse_args(argv[1:])
     
     if after_dash is None:
@@ -52,6 +53,10 @@ def parse_args(argv=sys.argv, do_wizard=True):
         arguments.pin = Pin.do_wizard(arguments, file_dir / 'install.sh')
     else:
         arguments.pin = Pin(arguments)
+
+    if arguments.clang_library_file:
+        log.debug(f'Setting clang library file to {arguments.clang_library_file}')
+        Config.set_library_file(arguments.clang_library_file)
 
     log.debug(f'arguments: {arguments}')
 
