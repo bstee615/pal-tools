@@ -78,6 +78,15 @@ def debug_print_code(locations):
             linetext_by_filepath[filepath].append(filelines[l-1])
     return {fp:list(zip(linenos_by_filepath[fp], linetext_by_filepath[fp])) for fp in linenos_by_filepath}
 
+def slim(locations):
+    """Store only filepath and lineno and dedup"""
+    slim_locations = []
+    for l in locations:
+        sl = SlimLocation(l.filepath, l.lineno)
+        if len(slim_locations) == 0 or slim_locations[-1] != sl:
+            slim_locations.append(sl)
+    return slim_locations
+
 def main():
     global args
     args = parse_args()
@@ -104,20 +113,20 @@ def main():
     clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
     static_locations = get_static_locations(dynamic_locations, clang_include_paths)
 
-    # Output trace locations to file
-    all_locations = dynamic_locations + static_locations
-    slim_locations = set(SlimLocation(l.filepath, l.lineno) for l in all_locations)
+    # Store only filepath and lineno and dedup
+    all_locations = slim(dynamic_locations) + slim(static_locations)
     
+    # Output trace locations to file
     if args.output_file:
         output_stream = open(args.output_file, 'w')
     else:
         output_stream = sys.stdout
-    for l in slim_locations:
+    for l in all_locations:
         output_stream.write(f'{l.filepath}:{l.lineno}\n')
     if output_stream is not sys.stdout:
         output_stream.close()
 
-    debug_info = debug_print_code(slim_locations)
+    debug_info = debug_print_code(all_locations)
     for filepath, content in debug_info.items():
         log.debug(filepath)
         for lineno, text in content:
