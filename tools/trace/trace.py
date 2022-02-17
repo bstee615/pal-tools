@@ -167,14 +167,17 @@ def get_static_locations(dynamic_locations, clang_include_paths):
     return static_locations
 
 
-def slim(locations, add_code):
+def slim(locations, add_column, add_code):
     """Store only filepath and lineno and dedup"""
     slim_locations = []
     for l in locations:
+        column = None
+        if add_column:
+            column = l.column
+        code = None
         if add_code:
-            sl = SlimLocation(l.filepath, l.lineno, l.column, get_code(l.node))
-        else:
-            sl = SlimLocation(l.filepath, l.lineno, l.column, None)
+            code = get_code(l.node)
+        sl = SlimLocation(l.filepath, l.lineno, column, code)
         if len(slim_locations) == 0 or slim_locations[-1] != sl:
             slim_locations.append(sl)
     return slim_locations
@@ -210,9 +213,9 @@ def main():
         dynamic_locations, clang_include_paths)
 
     # Store only filepath and lineno and dedup
-    all_locations = slim(dynamic_locations, args.include_code)
+    all_locations = slim(dynamic_locations, args.include_column, args.include_code)
     if args.include_static:
-        all_locations += slim(static_locations, args.include_code)
+        all_locations += slim(static_locations, args.include_column, args.include_code)
 
     # Output trace locations to file
     if args.output_file:
