@@ -26,7 +26,7 @@ def parse_args(argv=sys.argv, do_wizard=True):
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)', default='WARN')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-k', '--keep-logfile', action='store_true', help='Keep the log file after running Pin')
-    parser.add_argument('--include_static', action='store_true', help='Output static trace')
+    parser.add_argument('-s', '--include_static', action='store_true', help='Output static trace')
     parser.add_argument('--include_code', action='store_true', help='Output code statements')
     parser.add_argument('--include_column', action='store_true', help='Output column numbers')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
