@@ -47,12 +47,16 @@ class Pin:
                 log.error(f'Could not execute {install_sh}.')
                 exit(1)
             else:
-                log.warn(f'See {install_sh} for the recommended method for installing Pin.')
-                yn = input(f'Should I install it at {root}? [type y to install, anything else to quit]: ')
+                log.warn(
+                    f'See {install_sh} for the recommended method for installing Pin.')
+                yn = input(
+                    f'Should I install it at {root}? [type y to install, anything else to quit]: ')
                 if yn == 'y':
                     cmd = f'bash {install_sh.absolute()} {root.name}'
-                    log.debug(f'Running Bash script install.sh with "{cmd}" in directory "{root}"')
-                    proc = subprocess.Popen(cmd.split(), cwd=root.parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    log.debug(
+                        f'Running Bash script install.sh with "{cmd}" in directory "{root}"')
+                    proc = subprocess.Popen(
+                        cmd.split(), cwd=root.parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                     stdout, _ = proc.communicate()
                     for l in stdout.decode().splitlines():
                         log.info(f'**[{install_sh.name}]** {l}')
@@ -69,7 +73,7 @@ class Pin:
             log.error(f'Something is wrong with the Pin environment at {root}')
 
         return pin
-    
+
     def run(self, target, target_args):
         """
         Run Pin. Collect results in temporary file pin.log
@@ -98,24 +102,28 @@ class Pin:
             # Run Pin
             cmd = f'{self.exe} -error_file {errorfile.absolute()} -t {self.lib} -o {logfile} -c -- {target.absolute()}'
             args = cmd.split() + target_args
-            p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            p = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             stdout, _ = p.communicate()
             return_code = p.returncode
             args_str = ' '.join(args)
 
             # Pin tool exits 1 on success ¯\_(ツ)_/¯ use errorfile to detect errors
-            log.info(f'Got return code {return_code} running pin with command: "{args_str}"')
+            log.info(
+                f'Got return code {return_code} running pin with command: "{args_str}"')
             if errorfile.is_file():
                 log.warn(f'Echoing Pin output stream:')
                 for l in stdout.decode().splitlines():
                     log.warn(f'* {l}')
                 errorfile.unlink()
-                raise Exception(f'Pin had an error while running. See {errorfile} for more information.')
+                raise Exception(
+                    f'Pin had an error while running. See {errorfile} for more information.')
             if errorfile.is_file():
                 errorfile.unlink()
 
             if not logfile.is_file():
-                raise Exception(f'Something went wrong running Pin -- {logfile} is missing.')
+                raise Exception(
+                    f'Something went wrong running Pin -- {logfile} is missing.')
             return parse_pinlog(logfile)
         finally:
             if logfile.is_file() and not self.keep_logfile:
