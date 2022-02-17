@@ -91,9 +91,12 @@ def main():
         log.error(traceback.format_exc())
         return -1
     log.debug(f'{len(dynamic_locations)} logs')
+    
     for l in dynamic_locations:
-        log.debug(f'dynamic location {l}')
-        if not Path(l.filepath).exists():
+        if Path(l.filepath).exists():
+            log.debug(f'dynamic location {l}')
+        elif args.verbose:
+            log.debug(f'dynamic location {l}')
             log.debug(f'^^^ file does not exist ^^^')
     
     dynamic_locations = [d for d in dynamic_locations if Path(d.filepath).exists()]
