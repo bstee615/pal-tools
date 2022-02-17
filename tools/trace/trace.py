@@ -26,7 +26,9 @@ def parse_args(argv=sys.argv, do_wizard=True):
     parser.add_argument('-l', '--log-level', help='Display logs at a certain level (DEBUG, INFO, ERROR)', default='WARN')
     parser.add_argument('-v', '--verbose', action='store_true', help='Display verbose logs in -lDEBUG')
     parser.add_argument('-k', '--keep-logfile', action='store_true', help='Keep the log file after running Pin')
-    parser.add_argument('-s', '--include_static', action='store_true', help='Output static trace')
+    parser.add_argument('--include_static', action='store_true', help='Output static trace')
+    parser.add_argument('--include_code', action='store_true', help='Output code statements')
+    parser.add_argument('--include_column', action='store_true', help='Output column numbers')
     parser.add_argument('-p', '--pin-root', type=str, help=f'Use an alternative path to Pin root. Default: {default_pinroot}', default=default_pinroot)
     parser.add_argument('-o', '--output-file', type=str, help='Output to a file')
     parser.add_argument('-I', default=[], dest='clang_include_paths', action='append', help='Include paths to pass to Clang (same as clang\'s -I flag)')
@@ -79,14 +81,23 @@ def debug_print_code(locations):
             linetext_by_filepath[filepath].append(filelines[l-1])
     return {fp:list(zip(linenos_by_filepath[fp], linetext_by_filepath[fp])) for fp in linenos_by_filepath}
 
-def slim(locations):
+def get_code(node):
+    if node.kind in (CursorKind.IF_STMT, CursorKind.FOR_STMT, CursorKind.WHILE_STMT, CursorKind.DO_STMT, CursorKind.SWITCH_STMT):
+        node = [c for c in node.get_children()][0]
+    return ' '.join(t.spelling for t in node.get_tokens())
+
+def slim(locations, add_code):
     """Store only filepath and lineno and dedup"""
     slim_locations = []
     for l in locations:
-        sl = SlimLocation(l.filepath, l.lineno)
+        if add_code:
+            sl = SlimLocation(l.filepath, l.lineno, l.column, get_code(l.node))
+        else:
+            sl = SlimLocation(l.filepath, l.lineno, l.column, None)
         if len(slim_locations) == 0 or slim_locations[-1] != sl:
             slim_locations.append(sl)
     return slim_locations
+
 
 def main():
     global args
@@ -117,7 +128,7 @@ def main():
         static_locations = get_static_locations(dynamic_locations, clang_include_paths)
 
     # Store only filepath and lineno and dedup
-    all_locations = slim(dynamic_locations) + slim(static_locations)
+    all_locations = slim(dynamic_locations, args.include_code) + slim(static_locations, args.include_code)
     
     # Output trace locations to file
     if args.output_file:
@@ -125,7 +136,13 @@ def main():
     else:
         output_stream = sys.stdout
     for l in all_locations:
-        output_stream.write(f'{l.filepath}:{l.lineno}\n')
+        s = f'{l.filepath}:{l.lineno}'
+        if args.include_column:
+            s += f':{l.column}'
+        if args.include_code:
+            s += f':{l.code}'
+        s += '\n'
+        output_stream.write(s)
     if output_stream is not sys.stdout:
         output_stream.close()
 
@@ -176,6 +193,7 @@ def get_static_locations(dynamic_locations, clang_include_paths):
         for l in locations:
             source_location = SourceLocation.from_position(root.translation_unit, file, l.lineno, l.column)
             node = Cursor.from_location(root.translation_unit, source_location)
+            l.node = node
             if node.kind.is_invalid():
                 continue
             ancestor = ancestor_node(node)
@@ -187,7 +205,7 @@ def get_static_locations(dynamic_locations, clang_include_paths):
                 continue # Do not include global constructs
             else:
                 nodes = nodeutils.find(a, good)
-                locations = [Location(n.location.file.name, n.location.line, n.location.column) for n in nodes]
+                locations = [Location(n.location.file.name, n.location.line, n.location.column, n) for n in nodes]
                 for l in locations:
                     log.debug(f'static location {l}')
                 static_locations += locations
