@@ -217,6 +217,10 @@ def main():
     if args.include_static:
         all_locations += slim(static_locations, args.include_column, args.include_code)
 
+    if len(all_locations) == 0:
+        log.error('No traces generated. Check if the source file was moved.')
+        return 1
+
     # Output trace locations to file
     if args.output_file:
         output_stream = open(args.output_file, 'w')
