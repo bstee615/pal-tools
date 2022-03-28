@@ -163,7 +163,8 @@ def get_static_locations(dynamic_locations, clang_include_paths):
                 continue
             ancestor = ancestor_node(node)
             if ancestor not in ancestors:
-                node_log(f'node {nodeutils.pp(node)} has ancestor {nodeutils.pp(ancestor)}')
+                node_log(
+                    f'node {nodeutils.pp(node)} has ancestor {nodeutils.pp(ancestor)}')
                 ancestors.append(ancestor)
         for a in ancestors:
             if a.kind.is_translation_unit():
@@ -210,7 +211,7 @@ def filter_to_prefixes(locs, prefixes):
         f"- {fname}: {count}"
         for fname, count in
         sorted(rejected_loc_files.items(), key=lambda p: p[1], reverse=True)
-        )
+    )
     log.debug(f'Rejected {len(rejected_loc_files)} files:\n{rejected_loc_str}')
     return accepted_locs
 
@@ -229,7 +230,8 @@ def main():
         return -1
     log.debug(f'{len(dynamic_locations)} logs')
 
-    dynamic_locations = filter_to_prefixes(dynamic_locations, args.include_source_prefix)
+    dynamic_locations = filter_to_prefixes(
+        dynamic_locations, args.include_source_prefix)
 
     for l in dynamic_locations:
         if Path(l.filepath).exists():
@@ -246,9 +248,11 @@ def main():
         dynamic_locations, clang_include_paths)
 
     # Store only filepath and lineno and dedup
-    all_locations = slim(dynamic_locations, args.include_column, args.include_code)
+    all_locations = slim(
+        dynamic_locations, args.include_column, args.include_code)
     if args.include_static:
-        all_locations += slim(static_locations, args.include_column, args.include_code)
+        all_locations += slim(static_locations,
+                              args.include_column, args.include_code)
 
     if len(all_locations) == 0:
         log.error('No traces generated. Check if the source file was moved.')
