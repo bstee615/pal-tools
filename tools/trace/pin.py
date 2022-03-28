@@ -101,6 +101,7 @@ class Pin:
 
             # Run Pin
             cmd = f'{self.exe} -error_file {errorfile.absolute()} -t {self.lib} -o {logfile} -c -- {target.absolute()}'
+            log.debug(f'pin command: {cmd}')
             args = cmd.split() + target_args
             p = subprocess.Popen(
                 args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

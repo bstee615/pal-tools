@@ -9,5 +9,8 @@ class Location:
         self.column = column
         self.node = node
 
+    def __repr__(self):
+        return f'{self.filepath}:{self.lineno}:{self.column} {self.node.spelling if self.node else None}'
+
 
 SlimLocation = namedtuple('SlimLocation', 'filepath lineno column code')
