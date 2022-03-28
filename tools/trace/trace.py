@@ -1,6 +1,6 @@
 #!/bin/python3
 
-from mylog import log
+from mylog import log, CappedLog
 import argparse
 import logging
 import nodeutils
@@ -11,6 +11,12 @@ import sys
 from .pin import Pin
 from .location import Location, SlimLocation
 import traceback
+
+
+node_log = CappedLog()
+staticloc_log = CappedLog()
+dynloc_log = CappedLog()
+printcode_log = CappedLog()
 
 
 def parse_args(argv=sys.argv, do_wizard=True):
@@ -150,8 +156,7 @@ def get_static_locations(dynamic_locations, clang_include_paths):
                 continue
             ancestor = ancestor_node(node)
             if ancestor not in ancestors:
-                log.debug(
-                    f'node {nodeutils.pp(node)} has ancestor {nodeutils.pp(ancestor)}')
+                node_log(f'node {nodeutils.pp(node)} has ancestor {nodeutils.pp(ancestor)}')
                 ancestors.append(ancestor)
         for a in ancestors:
             if a.kind.is_translation_unit():
@@ -161,7 +166,7 @@ def get_static_locations(dynamic_locations, clang_include_paths):
                 locations = [Location(
                     n.location.file.name, n.location.line, n.location.column, n) for n in nodes]
                 for l in locations:
-                    log.debug(f'static location {l}')
+                    staticloc_log(f'static location {l}')
                 static_locations += locations
 
     return static_locations
@@ -199,10 +204,9 @@ def main():
 
     for l in dynamic_locations:
         if Path(l.filepath).exists():
-            log.debug(f'dynamic location {l}')
+            dynloc_log(f'dynamic location {l}')
         elif args.verbose:
-            log.debug(f'dynamic location {l}')
-            log.debug(f'^^^ file does not exist ^^^')
+            dynloc_log(f'dynamic location {l}\n^^^ file does not exist ^^^')
 
     dynamic_locations = [
         d for d in dynamic_locations if Path(d.filepath).exists()]
@@ -241,7 +245,7 @@ def main():
     for filepath, content in debug_info.items():
         log.debug(filepath)
         for lineno, text in content:
-            log.debug(f'{lineno:4} {text}')
+            printcode_log(f'{lineno:4} {text}')
     return 0
 
 
