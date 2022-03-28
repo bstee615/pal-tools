@@ -50,6 +50,13 @@ def parse_args(argv=sys.argv, do_wizard=True):
                         help='Include paths to pass to Clang (same as clang\'s -I flag)')
     parser.add_argument('--clang_library_file', type=str,
                         help='Library file to load for Libclang stuff')
+    parser.add_argument('--include_source_prefix', nargs='+', default=['/home', '/root'],
+                        help='Prefixes from which to include source files. '
+                        'By default, only files in the main executable are included. '
+                        'If you are linking with a library for which you want to trace the source code, '
+                        'then add it here as an argument. '
+                        'WARNING: if you do specify an argument, then '
+                        'the defaults /home and /root will not be included.')
     arguments = parser.parse_args(argv[1:])
 
     if after_dash is None:
@@ -188,6 +195,26 @@ def slim(locations, add_column, add_code):
     return slim_locations
 
 
+def filter_to_prefixes(locs, prefixes):
+    accepted_locs = []
+    rejected_locs = []
+    for l in locs:
+        if any(l.filepath.startswith(p) for p in prefixes):
+            accepted_locs.append(l)
+        else:
+            rejected_locs.append(l)
+    rejected_loc_files = defaultdict(int)
+    for l in rejected_locs:
+        rejected_loc_files[l.filepath] += 1
+    rejected_loc_str = "\n".join(
+        f"- {fname}: {count}"
+        for fname, count in
+        sorted(rejected_loc_files.items(), key=lambda p: p[1], reverse=True)
+        )
+    log.debug(f'Rejected {len(rejected_loc_files)} files:\n{rejected_loc_str}')
+    return accepted_locs
+
+
 def main():
     global args
     args = parse_args()
@@ -201,6 +228,8 @@ def main():
         log.error(traceback.format_exc())
         return -1
     log.debug(f'{len(dynamic_locations)} logs')
+
+    dynamic_locations = filter_to_prefixes(dynamic_locations, args.include_source_prefix)
 
     for l in dynamic_locations:
         if Path(l.filepath).exists():

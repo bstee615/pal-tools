@@ -12,7 +12,7 @@ Trace a command with `trace -- <command>`. See `trace -h` for info.
 This example invokes `trace` to trace execution of an example program `data/test`.
 
 ```
-[me@centos8 pal-tools]$ gcc -g -O0 data/test.c -odata/test
+[me@centos8 pal-tools]$ gcc -gdwarf-4 -O0 data/test.c -odata/test
 [me@centos8 pal-tools]$ cat data/test.c
 int main(int argc, char **argv)
 {
@@ -66,7 +66,7 @@ In this case, you can specify an include path the same way you do for Clang, wit
 In this example, giving the include path `-Itools/trace/tests/hidden` allows Clang to find the missing header and adds the variable declaration at line 5.
 
 ```
-[me@centos8 pal-tools]$ gcc -g -O0 tools/trace/tests/includeme.c -otools/trace/tests/includeme -Itools/trace/tests/hidden
+[me@centos8 pal-tools]$ gcc -gdwarf-4 -O0 tools/trace/tests/includeme.c -otools/trace/tests/includeme -Itools/trace/tests/hidden
 [me@centos8 pal-tools]$ cat -n tools/trace/tests/includeme.c
      1  #include <includeme.h>
      2
@@ -93,6 +93,14 @@ In this example, giving the include path `-Itools/trace/tests/hidden` allows Cla
 /home/me/work/pal-tools/tools/trace/tests/includeme.c:8
 /home/me/work/pal-tools/tools/trace/tests/includeme.c:9
 ```
+
+## Source prefixes
+
+Some projects link with libraries which we want to trace as well.
+`trace` automatically filters all locations to filepaths which begin with a known prefix.
+The default known prefixes are `/home` and `/root`.
+Custom prefixes can be specified with the option `--include_source_prefix`.
+Keep in mind, this will clear the defaults `/home` and `/root`, so if you want to keep these, you should specify them as well.
 
 # Setup
 
