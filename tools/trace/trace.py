@@ -4,7 +4,7 @@ from mylog import log, CappedLog
 import argparse
 import logging
 import nodeutils
-from clang.cindex import Config, Cursor, CursorKind, File, SourceLocation
+from clang.cindex import Config, Cursor, CursorKind, File, SourceLocation, TranslationUnitLoadError
 from pathlib import Path
 from collections import defaultdict
 import sys
@@ -151,7 +151,12 @@ def get_static_locations(dynamic_locations, clang_include_paths):
     for filepath, locations in filepaths.items():
         log.debug(
             f'Parsing source file {filepath} with args {clang_include_paths}')
-        root = nodeutils.parse(filepath, clang_include_paths)
+        root = None
+        try:
+            root = nodeutils.parse(filepath, clang_include_paths)
+        except TranslationUnitLoadError:
+            log.warn(f'error parsing file: {filepath}')
+            continue
         ancestors = []
         file = File.from_name(root.translation_unit, filepath)
         for l in locations:
