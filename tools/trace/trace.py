@@ -240,9 +240,11 @@ def main():
 
     for l in dynamic_locations:
         if Path(l.filepath).exists():
-            dynloc_log(f'dynamic location {l}')
+            printed = dynloc_log(f'dynamic location {l}')
         elif args.verbose:
-            dynloc_log(f'dynamic location {l}\n^^^ file does not exist ^^^')
+            printed = dynloc_log(f'dynamic location {l}\n^^^ file does not exist ^^^')
+        if not printed:
+            break
 
     dynamic_locations = [
         d for d in dynamic_locations if Path(d.filepath).exists()]

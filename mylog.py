@@ -24,6 +24,10 @@ class CappedLog:
     def __call__(self, *args, **kwargs):
         if self.count < self.limit:
             self.log(*args, **kwargs)
+            printed = True
+        else:
+            printed = False
         if self.count == self.limit - 1:
             self.log(f'^^^ CAPPING this log at {self.limit} items ^^^')
         self.count += 1
+        return printed
