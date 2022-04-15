@@ -121,6 +121,8 @@ def get_static_locations(dynamic_locations, clang_include_paths):
     - Variable declarations without any executable code "int i;"
     - Case statements "case foo:"
     - Default statements "default: "
+
+    Also adds .node attribute to all dynamic locations (used to retrieve code line).
     """
     static_locations = []
 
@@ -248,11 +250,12 @@ def main():
 
     dynamic_locations = [
         d for d in dynamic_locations if Path(d.filepath).exists()]
-
+    
     static_locations = []
     clang_include_paths = [f'-I{p}' for p in args.clang_include_paths]
-    static_locations = get_static_locations(
-        dynamic_locations, clang_include_paths)
+    if args.include_code or args.include_static:
+        static_locations = get_static_locations(
+            dynamic_locations, clang_include_paths)
 
     # Store only filepath and lineno and dedup
     all_locations = slim(
